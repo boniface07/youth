@@ -1,0 +1,122 @@
+import { useDropzone } from 'react-dropzone';
+import { Box, Typography, Button, IconButton } from '@mui/material';
+import ClearIcon from '@mui/icons-material/Clear';
+import { theme } from '../../theme'; // Adjust the import path as necessary
+import { useState } from 'react';
+
+const ImageUploader = ({ image, onImageChange, label }) => {
+  const [error, setError] = useState('');
+
+  const { getRootProps, getInputProps, isDragActive } = useDropzone({
+    accept: {
+      'image/jpeg': ['.jpg', '.jpeg'],
+      'image/png': ['.png'],
+    },
+    maxSize: 5 * 1024 * 1024, // 5MB limit
+    onDrop: (acceptedFiles) => {
+      console.log('[ImageUploader] Files dropped:', acceptedFiles);
+      if (acceptedFiles.length > 0) {
+        const file = acceptedFiles[0];
+        console.log('[ImageUploader] Selected file:', file);
+        onImageChange(file); // Pass file to AdminHome.jsx
+        setError('');
+      }
+    },
+    onDropRejected: (fileRejections) => {
+      console.log('[ImageUploader] Files rejected:', fileRejections);
+      setError('Invalid file. Please upload a JPG or PNG (max 5MB).');
+      onImageChange(null);
+    },
+  });
+
+  const handleClear = () => {
+    console.log('[ImageUploader] Clearing image');
+    onImageChange(null);
+    setError('');
+  };
+
+  return (
+    <Box
+      sx={{ mb: 3, width: '100%' }}
+      role="region"
+      aria-label={`${label} image uploader`}
+    >
+      <Typography
+        variant="h6"
+        component="label"
+        htmlFor="image-uploader-input"
+        sx={{
+          mb: 1,
+          fontWeight: 600,
+          color: theme.palette.text.primary,
+          display: 'block',
+        }}
+      >
+        {label}
+      </Typography>
+      <Box
+        {...getRootProps()}
+        sx={{
+          border: `2px dashed ${theme.palette.border.main}`,
+          borderRadius: '8px',
+          p: 2,
+          textAlign: 'center',
+          cursor: 'pointer',
+          bgcolor: isDragActive ? theme.palette.action.hover : 'transparent',
+          transition: 'background-color 0.2s',
+          '&:hover': { bgcolor: theme.palette.action.hover },
+          position: 'relative',
+        }}
+        aria-describedby="image-uploader-desc"
+      >
+        <input id="image-uploader-input" {...getInputProps()} />
+        {image ? (
+          <Box sx={{ position: 'relative', display: 'inline-block' }}>
+            <Box
+              component="img"
+              src={image}
+              alt="Uploaded image preview"
+              sx={{
+                maxWidth: '100%',
+                maxHeight: { xs: '150px', sm: '200px' },
+                borderRadius: '4px',
+              }}
+            />
+            <IconButton
+              onClick={handleClear}
+              aria-label="Clear uploaded image"
+              sx={{
+                position: 'absolute',
+                top: -12,
+                right: -12,
+                bgcolor: theme.palette.error.main,
+                color: '#fff',
+                '&:hover': { bgcolor: theme.palette.error.dark },
+              }}
+              size="small"
+            >
+              <ClearIcon fontSize="small" />
+            </IconButton>
+          </Box>
+        ) : (
+          <Typography
+            color="text.secondary"
+            sx={{ fontSize: { xs: '0.9rem', sm: '1rem' } }}
+            id="image-uploader-desc"
+          >
+            {isDragActive
+              ? 'Drop the image here'
+              : 'Drag & drop an image or click to select (JPG, PNG, max 5MB)'}
+          </Typography>
+        )}
+      </Box>
+      {error && (
+        <Typography color="error" sx={{ mt: 1, fontSize: '0.9rem' }}>
+          {error}
+        </Typography>
+      )}
+    </Box>
+  );
+};
+
+export default ImageUploader;
