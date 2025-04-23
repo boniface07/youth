@@ -1,0 +1,34 @@
+services:
+  - type: web
+    name: youth-spark-frontend
+    env: static
+    plan: free
+    repo: https://github.com/boniface07/youth-spark-app
+    branch: main
+    buildCommand: npm install && npm run build
+    staticPublishPath: dist
+    envVars:
+      - key: VITE_API_URL
+        value: https://youth-spark-backend.onrender.com
+    autoDeploy: true
+
+  - type: web
+    name: youth-spark-backend
+    env: node
+    plan: free
+    repo: https://github.com/boniface07/youth-spark-backend
+    branch: main
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: DB_HOST
+        sync: false # Replace with your PlanetScale host
+      - key: DB_USER
+        sync: false # Replace with your PlanetScale user
+      - key: DB_PASSWORD
+        sync: false # Replace with your PlanetScale password
+      - key: DB_NAME
+        value: youth_spark
+      - key: PORT
+        value: 3001
+    autoDeploy: true
