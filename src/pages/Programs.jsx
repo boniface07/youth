@@ -36,7 +36,7 @@ import {
   VolunteerActivism as VolunteerActivismIcon,
   WorkspacePremium as WorkspacePremiumIcon,
   ConnectWithoutContact as ConnectWithoutContactIcon,
-  LocalFlorist as LocalFloristIcon, // Replaced Eco
+  LocalFlorist as LocalFloristIcon,
   TrendingUp as TrendingUpIcon,
   Celebration as CelebrationIcon,
 } from '@mui/icons-material';
@@ -89,45 +89,48 @@ const iconMap = {
   VolunteerActivism: <VolunteerActivismIcon />,
   WorkspacePremium: <WorkspacePremiumIcon />,
   ConnectWithoutContact: <ConnectWithoutContactIcon />,
-  LocalFlorist: <LocalFloristIcon />, // Replaced Eco
+  LocalFlorist: <LocalFloristIcon />,
   TrendingUp: <TrendingUpIcon />,
   Celebration: <CelebrationIcon />,
 };
 
-// Strip HTML for display
-const stripHtml = (html) => {
-    try {
-      const div = document.createElement('div');
-      div.innerHTML = html || '';
-      return div.textContent || div.innerText || '';
-    } catch {
-      return html || '';
-    }
-  }
-// Rest of Programs.jsx remains unchanged
+// Ensure no trailing slash in API_BASE_URL
+const API_BASE_URL = import.meta.env.VITE_API_URL?.replace(/\/$/, '');
+
 const Programs = () => {
   const [programs, setPrograms] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  useEffect(() => {
-    const fetchPrograms = async () => {
-      try {
-        setIsLoading(true);
-        const response = await axios.get('/api/programs', { timeout: 5000 });
-        // Strip HTML from descriptions
-        const sanitizedPrograms = response.data.map(program => ({
-          ...program,
-          description: stripHtml(program.description),
-        }));
-        setPrograms(sanitizedPrograms);
-      } catch (err) {
-        console.error('Error fetching programs:', err);
-        setError('Failed to load programs. Please try again.');
-      } finally {
-        setIsLoading(false);
+  const fetchPrograms = async () => {
+    if (!API_BASE_URL) {
+      console.error('VITE_API_URL is not defined');
+      setError('Application configuration error. Please contact support.');
+      setIsLoading(false);
+      return;
+    }
+    console.log('Fetching programs from:', `${API_BASE_URL}/api/programs`);
+    setIsLoading(true);
+    setError(null);
+    try {
+      const response = await axios.get(`${API_BASE_URL}/api/programs`, {
+        timeout: 10000, // 10-second timeout
+      });
+      console.log('Fetch response:', response.data);
+      if (!response.data || !Array.isArray(response.data)) {
+        throw new Error('Invalid response from server');
       }
-    };
+      setPrograms(response.data);
+    } catch (err) {
+      console.error('Error fetching programs:', err.response?.data || err.message);
+      setError('Failed to load programs. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    console.log('API_BASE_URL:', API_BASE_URL);
     fetchPrograms();
   }, []);
 
@@ -142,7 +145,16 @@ const Programs = () => {
   if (error) {
     return (
       <Container sx={{ py: 4, textAlign: 'center' }}>
-        <Typography color="error">{error}</Typography>
+        <Typography color="error" sx={{ mb: 2 }}>
+          {error}
+        </Typography>
+        <Button
+          variant="contained"
+          onClick={fetchPrograms}
+          aria-label="Retry loading programs"
+        >
+          Retry
+        </Button>
       </Container>
     );
   }
@@ -280,7 +292,7 @@ const Programs = () => {
                     mb: 2,
                   }}
                 >
-                  {stripHtml(program.description) || 'No description'}
+                  {program.description || 'No description'}
                 </Typography>
               </Box>
             </Card>
