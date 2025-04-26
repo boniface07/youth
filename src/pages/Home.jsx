@@ -1,57 +1,75 @@
+// D:\Exercise\JAVASCRIPT\REACT PROJECT\YOUTH_SPARK\youth_spark_app\src\pages\Home.jsx
 import { useState, useEffect } from 'react';
 import axios from 'axios';
-import { Box, Typography, Button, Container, IconButton, Alert } from '@mui/material';
+import {
+  Box,
+  Typography,
+  Button,
+  Container,
+  IconButton,
+  Alert,
+  CircularProgress,
+} from '@mui/material';
 import EastIcon from '@mui/icons-material/East';
 import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
 import { Link } from 'react-router-dom';
 import { theme } from '../theme';
 
-// Ensure no trailing slash in API_BASE_URL
-const API_BASE_URL = import.meta.env.VITE_API_URL?.replace(/\/$/, '');
+// Normalize API_BASE_URL
+const API_BASE_URL = (import.meta.env.VITE_API_URL || 'http://localhost:5000')
+  .replace(/\/+$/, '')
+  .trim();
 
 const Home = () => {
   const [content, setContent] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        console.log('Home: Fetching data from', `${API_BASE_URL}/api/home`);
-        const response = await axios.get(`${API_BASE_URL}/api/home`, {
-          withCredentials: true, // Add if using credentials
-        });
-        console.log('Home: API response', response.data);
-        if (!response.data || Object.keys(response.data).length === 0) {
-          throw new Error('No content returned from API');
-        }
-        setContent({
-          heroTitle: response.data.title,
-          heroSubtitle: response.data.description,
-          heroImage: response.data.image_url,
-        });
-        setError(null);
-      } catch (err) {
-        console.error('Home: Error fetching home content:', err.message, err.response?.data);
-        setError('Failed to load content. Please try again later.');
-        setContent({
-          heroTitle: 'Youth Spark Foundation',
-          heroSubtitle: 'Building a future where Tanzanian youth thrive...',
-          heroImage:
-            'https://images.unsplash.com/photo-1521791055366-0d553872125f?ixlib=rb-1.2.1&auto=format&fit=crop&w=1350&q=80',
-        });
-      } finally {
-        setLoading(false);
-      }
-    };
+  const fetchData = async () => {
+    setLoading(true);
+    const url = `${API_BASE_URL}/api/home`.replace(/\/+/g, '/').replace(':/', '://');
+    console.log('[Home] Fetching data from:', url);
 
+    try {
+      const response = await axios.get(url, {
+        timeout: 10000, // Match AdminHome.jsx
+      });
+      console.log('[Home] API response:', response.data);
+      if (!response.data || Object.keys(response.data).length === 0) {
+        throw new Error('No content returned from API');
+      }
+      setContent({
+        heroTitle: response.data.title || 'Youth Spark Foundation',
+        heroSubtitle: response.data.description || 'Building a future where Tanzanian youth thrive...',
+        heroImage: response.data.image_url || '/images/default-hero.jpg',
+      });
+      setError(null);
+    } catch (err) {
+      console.error('[Home] Error fetching home content:', {
+        message: err.message,
+        response: err.response?.data,
+        status: err.response?.status,
+      });
+      setError(err.response?.data?.message || 'Failed to load content. Please try again.');
+      setContent({
+        heroTitle: 'Youth Spark Foundation',
+        heroSubtitle: 'Building a future where Tanzanian youth thrive...',
+        heroImage: '/images/default-hero.jpg',
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
     fetchData();
   }, []);
 
   if (loading) {
     return (
       <Container sx={{ textAlign: 'center', py: 4 }}>
-        <Typography>Loading...</Typography>
+        <CircularProgress />
+        <Typography sx={{ mt: 2 }}>Loading...</Typography>
       </Container>
     );
   }
@@ -76,7 +94,15 @@ const Home = () => {
       <meta property="og:type" content="website" />
       <meta property="og:image" content={content.heroImage} />
       {error && (
-        <Alert severity="error" sx={{ m: 2 }}>
+        <Alert
+          severity="error"
+          sx={{ m: 2 }}
+          action={
+            <Button color="inherit" size="small" onClick={fetchData}>
+              Retry
+            </Button>
+          }
+        >
           {error}
         </Alert>
       )}
@@ -217,6 +243,10 @@ const Home = () => {
                     transform: 'rotateY(0deg) scale(1.02)',
                     boxShadow: '0 15px 40px rgba(0, 0, 0, 0.4)',
                   },
+                }}
+                onError={(e) => {
+                  e.target.src = '/images/default-hero.jpg';
+                  console.error('[Home] Hero image load failed:', content.heroImage);
                 }}
               />
             </Box>

@@ -1,5 +1,20 @@
+// D:\Exercise\JAVASCRIPT\REACT PROJECT\YOUTH_SPARK\youth_spark_app\src\admin\pages\AdminHome.jsx
 import { useState, useEffect, Suspense, lazy } from 'react';
-import { Box, Typography, Button, Container, Grid, Card, CircularProgress, Alert } from '@mui/material';
+import {
+  Box,
+  Typography,
+  Button,
+  Container,
+  Grid,
+  Card,
+  CircularProgress,
+  Alert,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogContentText,
+  DialogTitle,
+} from '@mui/material';
 import { Formik, Form } from 'formik';
 import * as Yup from 'yup';
 import { Save as SaveIcon, Refresh as RefreshIcon } from '@mui/icons-material';
@@ -9,15 +24,18 @@ import axios from 'axios';
 const TextEditor = lazy(() => import('../component/TextEditor'));
 const ImageUploader = lazy(() => import('../component/ImageUploader'));
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+// Normalize API_BASE_URL
+const API_BASE_URL = (import.meta.env.VITE_API_URL || 'http://localhost:5000')
+  .replace(/\/+$/, '')
+  .trim();
 
 const validationSchema = Yup.object({
-  heroTitle: Yup.string().required('Required'),
-  heroSubtitle: Yup.string().required('Required'),
-  heroImage: Yup.string().required('Required'),
+  heroTitle: Yup.string().required('Hero Title is required').max(100, 'Title must be 100 characters or less'),
+  heroSubtitle: Yup.string().required('Hero Subtitle is required').max(1000, 'Subtitle must be 1000 characters or less'),
+  heroImage: Yup.string().required('Hero Image is required').url('Must be a valid URL'),
 });
 
-// Function to strip HTML tags
+// Strip HTML tags for submission
 const stripHtmlTags = (html) => {
   if (!html || typeof html !== 'string') return html;
   const parser = new DOMParser();
@@ -33,22 +51,29 @@ const AdminHome = () => {
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [resetDialogOpen, setResetDialogOpen] = useState(false);
 
+  // Fetch content on mount
   useEffect(() => {
     const fetchContent = async () => {
       setLoading(true);
+      const url = `${API_BASE_URL}/api/home`.replace(/\/+/g, '/').replace(':/', '://');
+      console.log('[AdminHome] Fetching content from:', url);
+
       try {
-        console.log('[AdminHome] Fetching content from:', `${API_BASE_URL}/api/home`);
-        const response = await axios.get(`${API_BASE_URL}/api/home`);
+        const response = await axios.get(url, {
+          headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+        });
         console.log('[AdminHome] API response:', response.data);
         if (!response.data || Object.keys(response.data).length === 0) {
           throw new Error('No content returned from API');
         }
-        setInitialValues({
+        const values = {
           heroTitle: response.data.title || '',
           heroSubtitle: response.data.description || '',
           heroImage: response.data.image_url || '',
-        });
+        };
+        setInitialValues(values);
         setError('');
       } catch (error) {
         console.error('[AdminHome] Error fetching content:', {
@@ -56,7 +81,7 @@ const AdminHome = () => {
           response: error.response?.data,
           status: error.response?.status,
         });
-        setError(`Failed to fetch homepage content: ${error.message}`);
+        setError(`Failed to fetch homepage content: ${error.response?.data?.message || error.message}`);
       } finally {
         setLoading(false);
       }
@@ -64,6 +89,7 @@ const AdminHome = () => {
     fetchContent();
   }, []);
 
+  // Handle image upload
   const handleImageUpload = async (file) => {
     if (!file) {
       console.error('[AdminHome] No file provided for upload');
@@ -71,10 +97,15 @@ const AdminHome = () => {
     }
     const formData = new FormData();
     formData.append('image', file);
+    const url = `${API_BASE_URL}/api/upload`.replace(/\/+/g, '/').replace(':/', '://');
+    console.log('[AdminHome] Uploading image to:', url);
+
     try {
-      console.log('[AdminHome] Uploading image to:', `${API_BASE_URL}/api/upload`);
-      const response = await axios.post(`${API_BASE_URL}/api/upload`, formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
+      const response = await axios.post(url, formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+          Authorization: `Bearer ${localStorage.getItem('token')}`,
+        },
       });
       console.log('[AdminHome] Image upload response:', response.data);
       return response.data.imageUrl;
@@ -88,29 +119,39 @@ const AdminHome = () => {
     }
   };
 
+  // Handle form submission
   const handleSubmit = async (values, { setSubmitting }) => {
     setLoading(true);
+    const url = `${API_BASE_URL}/api/home`.replace(/\/+/g, '/').replace(':/', '://');
+    console.log('[AdminHome] Submitting to:', url);
+
     try {
-      // Strip HTML tags from heroSubtitle
-      const cleanedDescription = stripHtmlTags(values.heroSubtitle);
       const cleanedTitle = stripHtmlTags(values.heroTitle);
+      const cleanedSubtitle = stripHtmlTags(values.heroSubtitle);
       console.log('[AdminHome] Submitting values:', {
-        heroTitle: cleanedTitle,
-        heroSubtitle: cleanedDescription,
-        heroImage: values.heroImage,
-      });
-      const response = await axios.put(`${API_BASE_URL}/api/home`, {
         title: cleanedTitle,
-        description: cleanedDescription,
+        description: cleanedSubtitle,
         image_url: values.heroImage,
       });
+
+      const response = await axios.put(
+        url,
+        {
+          title: cleanedTitle,
+          description: cleanedSubtitle,
+          image_url: values.heroImage,
+        },
+        {
+          headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+        }
+      );
       console.log('[AdminHome] PUT response:', response.data);
       setInitialValues({
         heroTitle: cleanedTitle,
-        heroSubtitle: cleanedDescription, // Keep HTML for preview
+        heroSubtitle: values.heroSubtitle, // Keep HTML for preview
         heroImage: values.heroImage,
       });
-      alert('Content updated successfully!');
+      alert('Homepage content updated successfully!');
       setError('');
     } catch (error) {
       console.error('[AdminHome] Error submitting content:', {
@@ -118,37 +159,47 @@ const AdminHome = () => {
         response: error.response?.data,
         status: error.response?.status,
       });
-      setError(`Failed to update homepage content: ${error.message}`);
+      setError(`Failed to update homepage content: ${error.response?.data?.message || error.message}`);
     } finally {
       setLoading(false);
       setSubmitting(false);
     }
   };
 
+  // Handle reset
   const handleReset = async (setValues) => {
-    setLoading(true);
-    try {
-      console.log('[AdminHome] Resetting form, fetching from:', `${API_BASE_URL}/api/home`);
-      const response = await axios.get(`${API_BASE_URL}/api/home`);
-      console.log('[AdminHome] Reset API response:', response.data);
-      const values = {
-        heroTitle: response.data.title || '',
-        heroSubtitle: response.data.description || '',
-        heroImage: response.data.image_url || '',
-      };
-      setValues(values);
-      setInitialValues(values);
-      setError('');
-    } catch (error) {
-      console.error('[AdminHome] Error resetting content:', {
-        message: error.message,
-        response: error.response?.data,
-        status: error.response?.status,
-      });
-      setError(`Failed to reset content: ${error.message}`);
-    } finally {
-      setLoading(false);
-    }
+    setResetDialogOpen(true);
+    const resetFn = async () => {
+      setLoading(true);
+      const url = `${API_BASE_URL}/api/home`.replace(/\/+/g, '/').replace(':/', '://');
+      console.log('[AdminHome] Resetting form, fetching from:', url);
+
+      try {
+        const response = await axios.get(url, {
+          headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+        });
+        console.log('[AdminHome] Reset API response:', response.data);
+        const values = {
+          heroTitle: response.data.title || '',
+          heroSubtitle: response.data.description || '',
+          heroImage: response.data.image_url || '',
+        };
+        setValues(values);
+        setInitialValues(values);
+        setError('');
+      } catch (error) {
+        console.error('[AdminHome] Error resetting content:', {
+          message: error.message,
+          response: error.response?.data,
+          status: error.response?.status,
+        });
+        setError(`Failed to reset content: ${error.response?.data?.message || error.message}`);
+      } finally {
+        setLoading(false);
+        setResetDialogOpen(false);
+      }
+    };
+    return resetFn;
   };
 
   return (
@@ -278,7 +329,7 @@ const AdminHome = () => {
                           </Button>
                           <Button
                             variant="outlined"
-                            onClick={() => handleReset(setValues)}
+                            onClick={() => setResetDialogOpen(true)}
                             disabled={isSubmitting || loading}
                             startIcon={<RefreshIcon />}
                             sx={{
@@ -291,6 +342,35 @@ const AdminHome = () => {
                             Reset
                           </Button>
                         </Box>
+
+                        {/* Reset Confirmation Dialog */}
+                        <Dialog
+                          open={resetDialogOpen}
+                          onClose={() => setResetDialogOpen(false)}
+                          aria-labelledby="reset-dialog-title"
+                          aria-describedby="reset-dialog-description"
+                        >
+                          <DialogTitle id="reset-dialog-title">Confirm Reset</DialogTitle>
+                          <DialogContent>
+                            <DialogContentText id="reset-dialog-description">
+                              Are you sure you want to reset the form? This will discard unsaved changes and reload the saved content.
+                            </DialogContentText>
+                          </DialogContent>
+                          <DialogActions>
+                            <Button onClick={() => setResetDialogOpen(false)} color="primary">
+                              Cancel
+                            </Button>
+                            <Button
+                              onClick={async () => {
+                                await handleReset(setValues)();
+                              }}
+                              color="primary"
+                              autoFocus
+                            >
+                              Reset
+                            </Button>
+                          </DialogActions>
+                        </Dialog>
                       </Form>
                     )}
                   </Formik>
@@ -310,21 +390,64 @@ const AdminHome = () => {
                     bgcolor: 'primary.main',
                     color: 'white',
                     borderRadius: 2,
+                    minHeight: 200,
                   }}
                 >
-                  <Typography variant="h3" gutterBottom>
-                    {initialValues.heroTitle}
+                  <Typography
+                    variant="h3"
+                    gutterBottom
+                    sx={{
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      display: '-webkit-box',
+                      WebkitLineClamp: 2,
+                      WebkitBoxOrient: 'vertical',
+                    }}
+                  >
+                    {initialValues.heroTitle || 'Enter a title...'}
                   </Typography>
-                  <Typography variant="h5">
-                    {initialValues.heroSubtitle}
-                  </Typography>
-                  {initialValues.heroImage && (
+                  <Typography
+                    variant="h5"
+                    sx={{
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      display: '-webkit-box',
+                      WebkitLineClamp: 4,
+                      WebkitBoxOrient: 'vertical',
+                    }}
+                    dangerouslySetInnerHTML={{ __html: initialValues.heroSubtitle || 'Enter a subtitle...' }}
+                  />
+                  {initialValues.heroImage ? (
                     <Box
                       component="img"
                       src={initialValues.heroImage}
                       alt="Hero"
-                      sx={{ maxWidth: '100%', borderRadius: '8px', mt: 2 }}
+                      sx={{
+                        maxWidth: '100%',
+                        borderRadius: '8px',
+                        mt: 2,
+                        objectFit: 'cover',
+                        maxHeight: 300,
+                      }}
+                      onError={(e) => {
+                        e.target.src = '/images/placeholder.jpg'; // Fallback image
+                        console.error('[AdminHome] Hero image load failed:', initialValues.heroImage);
+                      }}
                     />
+                  ) : (
+                    <Box
+                      sx={{
+                        bgcolor: 'grey.300',
+                        borderRadius: '8px',
+                        mt: 2,
+                        height: 200,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                    >
+                      <Typography color="text.secondary">No image selected</Typography>
+                    </Box>
                   )}
                 </Box>
               </Card>
