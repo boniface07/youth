@@ -260,6 +260,7 @@ function MainApp() {
                     fontWeight: 700,
                     fontSize: { xs: '1.2rem', md: '1.3rem' },
                     lineHeight: 1.2,
+                    textDecoration: 'none',
                     background: 'linear-gradient(to right, #1e40ae, #c23120)',
                     WebkitBackgroundClip: 'text',
                     backgroundClip: 'text',
@@ -275,6 +276,7 @@ function MainApp() {
                     color: theme.palette.text.secondary,
                     fontWeight: 400,
                     letterSpacing: '0.1em',
+                    textDecoration: 'none',
                   }}
                 >
                   FOUNDATION
