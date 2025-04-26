@@ -1,24 +1,43 @@
+// D:\Exercise\JAVASCRIPT\REACT PROJECT\YOUTH_SPARK\youth_spark_app\src\pages\Login.jsx
 import { useState } from 'react';
 import { Box, TextField, Button, Typography, Container } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
-import { theme } from '../../theme';
+import { theme } from '../theme';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+// Ensure no trailing slash in API_BASE_URL
+const API_BASE_URL = import.meta.env.VITE_API_URL?.replace(/\/$/, '') || 'http://localhost:5000';
 
 const Login = () => {
   const [credentials, setCredentials] = useState({ username: '', password: '' });
+  const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const navigate = useNavigate();
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const handleLogin = async () => {
+    if (!API_BASE_URL) {
+      console.error('VITE_API_URL is not defined');
+      setError('Application configuration error. Please contact support.');
+      return;
+    }
+
+    console.log('Attempting login with:', { username: credentials.username });
+    setIsLoading(true);
+    setError('');
+
     try {
-      const response = await axios.post(`${API_BASE_URL}/api/login`, credentials);
+      const response = await axios.post(
+        `${API_BASE_URL}/api/login`,
+        credentials,
+        {
+          timeout: 10000, // 10-second timeout
+        }
+      );
       console.log('Login response:', response.data);
       console.log('Login status:', response.status);
-      if (response.status !== 200) {
-        throw new Error('Login failed. Please try again.');
+
+      if (response.status !== 200 || !response.data.token || !response.data.user) {
+        throw new Error('Invalid response from server');
       }
 
       const { token, user } = response.data;
@@ -26,11 +45,19 @@ const Login = () => {
       localStorage.setItem('user', JSON.stringify(user));
 
       window.dispatchEvent(new Event('loginSuccess'));
-
+      console.log('Login successful, navigating to /admin');
       navigate('/admin');
     } catch (err) {
+      console.error('Login error:', err.response?.data || err.message);
       setError(err.response?.data?.message || 'Login failed. Please try again.');
+    } finally {
+      setIsLoading(false);
     }
+  };
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    handleLogin();
   };
 
   return (
@@ -66,6 +93,7 @@ const Login = () => {
               value={credentials.username}
               onChange={(e) => setCredentials({ ...credentials, username: e.target.value })}
               sx={{ mb: 2 }}
+              disabled={isLoading}
             />
             <TextField
               label="Password"
@@ -74,6 +102,7 @@ const Login = () => {
               value={credentials.password}
               onChange={(e) => setCredentials({ ...credentials, password: e.target.value })}
               sx={{ mb: 2 }}
+              disabled={isLoading}
             />
             {error && (
               <Typography color="error" sx={{ mb: 2 }}>
@@ -84,13 +113,26 @@ const Login = () => {
               type="submit"
               variant="contained"
               fullWidth
+              disabled={isLoading}
               sx={{
                 background: `linear-gradient(135deg, ${theme.palette.primary.main}, ${theme.palette.secondary.main})`,
                 '&:hover': { transform: 'scale(1.05)' },
               }}
             >
-              Login
+              {isLoading ? 'Logging in...' : 'Login'}
             </Button>
+            {error && (
+              <Button
+                variant="outlined"
+                fullWidth
+                onClick={handleLogin}
+                sx={{ mt: 2 }}
+                disabled={isLoading}
+                aria-label="Retry login"
+              >
+                Retry
+              </Button>
+            )}
           </form>
         </Box>
       </Container>
