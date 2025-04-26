@@ -5,6 +5,7 @@ import mysql from 'mysql2/promise';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import path from 'path';
+import fs from 'fs';
 import { fileURLToPath } from 'url';
 import authRoutes from './routes/auth.js';
 import homeRouter from './routes/home.js';
@@ -43,6 +44,7 @@ if (!process.env.DB_HOST || !process.env.DB_USER || !process.env.DB_PASSWORD || 
   process.exit(1);
 }
 
+// Initialize Express app
 const app = express();
 
 // Create MySQL connection pool
@@ -71,9 +73,9 @@ const pool = mysql.createPool({
 
 // Middleware
 const allowedOrigins = [
-  'https://youth-spark-frontend-production.up.railway.app', // From the error
-  'https://youth-spark-frontend-production-38ef.up.railway.app', // From your config
-  'http://localhost:3000', // For local development
+  'https://youth-spark-frontend-production.up.railway.app',
+  'https://youth-spark-frontend-production-38ef.up.railway.app',
+  'http://localhost:3000',
 ];
 
 app.use(
@@ -86,19 +88,12 @@ app.use(
 );
 
 app.use(express.json());
+
+// Serve static images
 app.use('/images', express.static(path.join(__dirname, 'public/images')));
 console.log('Serving static images from:', path.join(__dirname, 'public/images'));
 
-// Serve frontend (if backend serves frontend)
-const distPath = path.join(__dirname, 'dist');
-app.use(express.static(distPath));
-console.log('Serving frontend from:', distPath);
-app.get('*', (req, res) => {
-  console.log('Serving index.html for request:', req.url);
-  res.sendFile(path.join(distPath, 'index.html'));
-});
-
-// Routes
+// API Routes (must come before static file serving)
 try {
   console.log('Registering auth routes...');
   app.use('/api', authRoutes);
@@ -117,7 +112,24 @@ try {
   process.exit(1);
 }
 
-// Error handling
+// Serve frontend (COMMENT OUT THIS SECTION IF FRONTEND IS HOSTED SEPARATELY)
+const distPath = path.join(__dirname, 'dist');
+app.use(express.static(distPath));
+console.log('Serving frontend from:', distPath);
+
+// Catch-all route for frontend (only for non-API routes)
+app.get('*', (req, res) => {
+  const indexPath = path.join(distPath, 'index.html');
+  if (fs.existsSync(indexPath)) {
+    console.log('Serving index.html for request:', req.url);
+    res.sendFile(indexPath);
+  } else {
+    console.error('index.html not found at:', indexPath);
+    res.status(404).json({ error: 'Frontend files not found. Ensure dist folder exists.' });
+  }
+});
+
+// Error handling middleware
 app.use((err, req, res, next) => {
   console.error('Application error:', err);
   res.status(500).json({ error: 'Something went wrong!' });
