@@ -6,98 +6,47 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import cookieParser from 'cookie-parser';
-import compression from 'compression';
+import authRoutes from './routes/auth.js';
+import homeRouter from './routes/home.js';
+import uploadRouter from './routes/upload.js';
+import aboutRouter from './routes/about.js';
+import programsRouter from './routes/programs.js';
+import impactRouter from './routes/impact.js';
 
-// Initialize environment
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-dotenv.config();
 
-// Initialize Express
+console.log('Starting server initialization...');
+console.log('Current directory:', __dirname);
+
+// Load environment variables
+if (process.env.NODE_ENV !== 'production') {
+  const envPath = path.resolve(__dirname, '.env');
+  const dotenvConfig = dotenv.config({ path: envPath });
+  if (dotenvConfig.error) {
+    console.error('Dotenv error (ignored in production):', dotenvConfig.error);
+  } else {
+    console.log('Environment variables loaded from .env');
+  }
+} else {
+  console.log('Running in production, using environment variables');
+}
+
+// Check for required environment variables
+if (!process.env.DB_HOST || !process.env.DB_USER || !process.env.DB_PASSWORD || !process.env.DB_NAME) {
+  console.error('Missing required environment variables:', {
+    DB_HOST: !!process.env.DB_HOST,
+    DB_USER: !!process.env.DB_USER,
+    DB_PASSWORD: !!process.env.DB_PASSWORD,
+    DB_NAME: !!process.env.DB_NAME,
+  });
+  process.exit(1);
+}
+
 const app = express();
 
-// =====================
-// SECURITY CONFIGURATION
-// =====================
-
-// Security Headers Middleware
-app.use((req, res, next) => {
-  // Set security headers
-  res.setHeader('X-Content-Type-Options', 'nosniff');
-  res.setHeader('X-Frame-Options', 'DENY');
-  res.setHeader('X-XSS-Protection', '1; mode=block');
-  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
-  res.setHeader('Permissions-Policy', 'geolocation=(), microphone=()');
-  next();
-});
-
-// Rate Limiting Middleware (custom implementation)
-const requestCounts = new Map();
-const RATE_LIMIT_WINDOW = 15 * 60 * 1000; // 15 minutes
-const RATE_LIMIT_MAX = 1000; // Max requests per window
-
-setInterval(() => requestCounts.clear(), RATE_LIMIT_WINDOW);
-
-app.use((req, res, next) => {
-  const ip = req.ip;
-  const count = requestCounts.get(ip) || 0;
-  
-  if (count >= RATE_LIMIT_MAX) {
-    return res.status(429).json({ 
-      error: 'Too many requests, please try again later' 
-    });
-  }
-  
-  requestCounts.set(ip, count + 1);
-  next();
-});
-
-// Input Sanitization Middleware
-app.use((req, res, next) => {
-  const sanitize = (data) => {
-    if (typeof data === 'string') {
-      return data.replace(/[<>"'`;]/g, '');
-    }
-    if (Array.isArray(data)) {
-      return data.map(sanitize);
-    }
-    if (typeof data === 'object' && data !== null) {
-      return Object.fromEntries(
-        Object.entries(data).map(([key, value]) => [key, sanitize(value)])
-      );
-    }
-    return data;
-  };
-
-  if (req.body) req.body = sanitize(req.body);
-  if (req.query) req.query = sanitize(req.query);
-  if (req.params) req.params = sanitize(req.params);
-  
-  next();
-});
-
-// ==============
-// REACT 19 SETUP
-// ==============
-
-// CORS Configuration
-const allowedOrigins = [
-  process.env.VITE_FRONTEND_URL,
-  'http://localhost:3000', // React 19 default
-  'http://localhost:5173'  // Vite default
-].filter(Boolean);
-
-app.use(cors({
-  origin: allowedOrigins,
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
-}));
-
-// ==============
-// MYSQL DATABASE
-// ==============
+// Create MySQL connection pool
+console.log('Creating MySQL connection pool...');
 const pool = mysql.createPool({
   host: process.env.DB_HOST,
   user: process.env.DB_USER,
@@ -105,89 +54,73 @@ const pool = mysql.createPool({
   database: process.env.DB_NAME,
   waitForConnections: true,
   connectionLimit: 10,
-  namedPlaceholders: true,
-  supportBigNumbers: true,
-  bigNumberStrings: true
+  queueLimit: 0,
 });
 
 // Test database connection
 (async () => {
   try {
-    const conn = await pool.getConnection();
-    await conn.ping();
-    conn.release();
-    console.log('✅ MySQL connection established');
+    const connection = await pool.getConnection();
+    console.log('Connected to MySQL successfully');
+    connection.release();
   } catch (err) {
-    console.error('❌ MySQL connection failed:', err);
+    console.error('MySQL connection error:', err);
     process.exit(1);
   }
 })();
 
-// =============
-// MIDDLEWARE
-// =============
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
-app.use(compression());
-app.use(cookieParser());
+// Middleware
+const allowedOrigins = [process.env.FRONTEND_URL || 'http://localhost:5173'];
+app.use(cors({
+  origin: (origin, callback) => {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+}));
+app.use(express.json());
+app.use('/images', express.static(path.join(__dirname, 'public/images')));
+console.log('Serving static images from:', path.join(__dirname, 'public/images'));
 
-// =============
-// ROUTES
-// =============
-
-// Health Check
-app.get('/api/health', (req, res) => {
-  res.json({
-    status: 'healthy',
-    reactVersion: '19.x',
-    database: 'MySQL',
-    environment: process.env.NODE_ENV || 'development'
-  });
+// Serve frontend
+const distPath = path.join(__dirname, 'dist');
+app.use(express.static(distPath));
+console.log('Serving frontend from:', distPath);
+app.get('*', (req, res) => {
+  console.log('Serving index.html for request:', req.url);
+  res.sendFile(path.join(distPath, 'index.html'));
 });
 
-// Example Secure Route
-app.post('/api/users', async (req, res) => {
-  try {
-    // Using parameterized query
-    const [result] = await pool.query(
-      'INSERT INTO users SET ?',
-      [req.body]
-    );
-    res.status(201).json({ id: result.insertId });
-  } catch (err) {
-    console.error('MySQL error:', err);
-    res.status(500).json({ error: 'Database operation failed' });
-  }
-});
+// Routes
+try {
+  console.log('Registering auth routes...');
+  app.use('/api', authRoutes);
+  console.log('Registering home routes...');
+  app.use('/api', homeRouter);
+  console.log('Registering upload routes...');
+  app.use('/api', uploadRouter);
+  console.log('Registering about routes...');
+  app.use('/api', aboutRouter);
+  console.log('Registering programs routes...');
+  app.use('/api', programsRouter);
+  console.log('Registering impact routes...');
+  app.use('/api', impactRouter);
+} catch (err) {
+  console.error('Error registering routes:', err);
+  process.exit(1);
+}
 
-// =============
-// ERROR HANDLING
-// =============
+// Error handling
 app.use((err, req, res, next) => {
-  console.error('Error:', err.stack);
-  res.status(500).json({ error: 'Internal Server Error' });
+  console.error('Application error:', err);
+  res.status(500).json({ error: 'Something went wrong!' });
 });
 
-// 404 Handler
-app.use((req, res) => {
-  res.status(404).json({ error: 'Endpoint not found' });
-});
-
-// =============
-// SERVER START
-// =============
+// Start server
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
-  console.log(`
-  🚀 Server running on port ${PORT}
-  ⚛️  React 19 Compatible
-  🔒 Security Features:
-     - Custom Rate Limiting
-     - Input Sanitization
-     - Secure Headers
-  💾 MySQL Database Connected
-  🌍 Allowed Origins: ${allowedOrigins.join(', ')}
-  `);
-});
+app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+console.log('Server startup complete');
 
 export { pool };
