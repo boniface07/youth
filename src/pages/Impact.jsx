@@ -8,6 +8,7 @@ import {
   CircularProgress,
   useTheme,
   Avatar,
+  Button,
 } from '@mui/material';
 import {
   EmojiEvents,
@@ -43,17 +44,6 @@ const pulse = keyframes`
   100% { transform: scale(1); }
 `;
 
-// Strip HTML for quotes
-const stripHtml = (html) => {
-  try {
-    const div = document.createElement('div');
-    div.innerHTML = html || '';
-    return div.textContent || div.innerText || '';
-  } catch {
-    return html || '';
-  }
-};
-
 // Icon map
 const iconMap = {
   EmojiEvents: <EmojiEvents fontSize="large" />,
@@ -70,32 +60,44 @@ const iconMap = {
   LocalLibrary: <LocalLibrary fontSize="large" />,
 };
 
+// Ensure no trailing slash in API_BASE_URL
+const API_BASE_URL = import.meta.env.VITE_API_URL?.replace(/\/$/, '');
+
 const Impact = () => {
   const theme = useTheme();
   const [data, setData] = useState({ stats: [], testimonials: [] });
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  useEffect(() => {
-    const fetchImpactData = async () => {
-      try {
-        setIsLoading(true);
-        const response = await axios.get('/api/impact', { timeout: 5000 });
-        const sanitizedData = {
-          stats: response.data.stats,
-          testimonials: response.data.testimonials.map((testimonial) => ({
-            ...testimonial,
-            quote: stripHtml(testimonial.quote),
-          })),
-        };
-        setData(sanitizedData);
-      } catch (err) {
-        console.error('Error fetching impact data:', err);
-        setError('Failed to load impact data. Please try again.');
-      } finally {
-        setIsLoading(false);
+  const fetchImpactData = async () => {
+    if (!API_BASE_URL) {
+      console.error('VITE_API_URL is not defined');
+      setError('Application configuration error. Please contact support.');
+      setIsLoading(false);
+      return;
+    }
+    console.log('Fetching impact data from:', `${API_BASE_URL}/api/impact`);
+    setIsLoading(true);
+    setError(null);
+    try {
+      const response = await axios.get(`${API_BASE_URL}/api/impact`, {
+        timeout: 10000, // 10-second timeout
+      });
+      console.log('Fetch response:', response.data);
+      if (!response.data || !Array.isArray(response.data.stats) || !Array.isArray(response.data.testimonials)) {
+        throw new Error('Invalid response from server');
       }
-    };
+      setData(response.data);
+    } catch (err) {
+      console.error('Error fetching impact data:', err.response?.data || err.message);
+      setError('Failed to load impact data. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    console.log('API_BASE_URL:', API_BASE_URL);
     fetchImpactData();
   }, []);
 
@@ -109,8 +111,17 @@ const Impact = () => {
 
   if (error) {
     return (
-      <Container maxWidth="lg" sx={{ py: 6 }}>
-        <Typography color="error">{error}</Typography>
+      <Container maxWidth="lg" sx={{ py: 6, textAlign: 'center' }}>
+        <Typography color="error" sx={{ mb: 2 }}>
+          {error}
+        </Typography>
+        <Button
+          variant="contained"
+          onClick={fetchImpactData}
+          aria-label="Retry loading impact data"
+        >
+          Retry
+        </Button>
       </Container>
     );
   }
@@ -332,11 +343,11 @@ const Impact = () => {
                     },
                   }}
                 >
-                  {stripHtml(testimonial.quote)}
+                  {testimonial.quote || 'No quote provided'}
                 </Typography>
                 <Box sx={{ display: 'flex', alignItems: 'center', mt: 'auto' }}>
                   <Avatar
-                    src={testimonial.avatar || '/avatars/default.jpg'} // Fallback to default avatar
+                    src={testimonial.avatar || undefined} // Use undefined for no src to avoid broken image
                     alt={testimonial.name}
                     className="avatar"
                     sx={{
@@ -344,7 +355,7 @@ const Impact = () => {
                       height: 48,
                       mr: 2,
                       border: `2px solid ${theme.palette.border?.main || '#e0e0e0'}`,
-                      backgroundColor: '#ff0000',
+                      bgcolor: '#ff0000',
                     }}
                   />
                   <Box>
@@ -356,7 +367,7 @@ const Impact = () => {
                         color: theme.palette.primary.main,
                       }}
                     >
-                      {testimonial.name}
+                      {testimonial.name || 'Anonymous'}
                     </Typography>
                     <Typography
                       variant="body2"
@@ -365,7 +376,7 @@ const Impact = () => {
                         fontSize: { xs: '0.85rem', sm: '0.9rem' },
                       }}
                     >
-                      {testimonial.program}
+                      {testimonial.program || 'Unknown Program'}
                     </Typography>
                   </Box>
                 </Box>
