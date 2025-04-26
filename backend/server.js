@@ -16,22 +16,37 @@ import impactRouter from './routes/impact.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+console.log('Starting server initialization...');
+console.log('Current directory:', __dirname);
+
 // Load environment variables
-const envPath = path.resolve(__dirname, '.env');
-const dotenvConfig = dotenv.config({ path: envPath });
-if (dotenvConfig.error) {
-  console.error('Dotenv error:', dotenvConfig.error);
-  throw new Error('Failed to load .env file');
+if (process.env.NODE_ENV !== 'production') {
+  const envPath = path.resolve(__dirname, '.env');
+  const dotenvConfig = dotenv.config({ path: envPath });
+  if (dotenvConfig.error) {
+    console.error('Dotenv error (ignored in production):', dotenvConfig.error);
+  } else {
+    console.log('Environment variables loaded from .env');
+  }
+} else {
+  console.log('Running in production, using environment variables');
 }
 
 // Check for required environment variables
 if (!process.env.DB_HOST || !process.env.DB_USER || !process.env.DB_PASSWORD || !process.env.DB_NAME) {
-  throw new Error('Missing required environment variables. Please check your .env file.');
+  console.error('Missing required environment variables:', {
+    DB_HOST: !!process.env.DB_HOST,
+    DB_USER: !!process.env.DB_USER,
+    DB_PASSWORD: !!process.env.DB_PASSWORD,
+    DB_NAME: !!process.env.DB_NAME,
+  });
+  process.exit(1);
 }
 
 const app = express();
 
 // Create MySQL connection pool
+console.log('Creating MySQL connection pool...');
 const pool = mysql.createPool({
   host: process.env.DB_HOST,
   user: process.env.DB_USER,
@@ -46,7 +61,7 @@ const pool = mysql.createPool({
 (async () => {
   try {
     const connection = await pool.getConnection();
-    console.log('Connected to MySQL');
+    console.log('Connected to MySQL successfully');
     connection.release();
   } catch (err) {
     console.error('MySQL connection error:', err);
@@ -55,7 +70,7 @@ const pool = mysql.createPool({
 })();
 
 // Middleware
-const allowedOrigins = [process.env.VITE_FRONTEND_URL];
+const allowedOrigins = [process.env.FRONTEND_URL || 'http://localhost:5173'];
 app.use(cors({
   origin: (origin, callback) => {
     if (!origin || allowedOrigins.includes(origin)) {
@@ -67,6 +82,16 @@ app.use(cors({
 }));
 app.use(express.json());
 app.use('/images', express.static(path.join(__dirname, 'public/images')));
+console.log('Serving static images from:', path.join(__dirname, 'public/images'));
+
+// Serve frontend
+const distPath = path.join(__dirname, 'dist');
+app.use(express.static(distPath));
+console.log('Serving frontend from:', distPath);
+app.get('*', (req, res) => {
+  console.log('Serving index.html for request:', req.url);
+  res.sendFile(path.join(distPath, 'index.html'));
+});
 
 // Routes
 app.use('/api', authRoutes);
@@ -76,23 +101,15 @@ app.use('/api', aboutRouter);
 app.use('/api', programsRouter);
 app.use('/api', impactRouter);
 
-
-// Serve frontend static files
-app.use(express.static(path.join(__dirname, 'dist')));
-
-// Handle client-side routing (for React Router)
-app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, 'dist', 'index.html'));
-});
 // Error handling
 app.use((err, req, res, next) => {
-  console.error(err.stack);
+  console.error('Application error:', err);
   res.status(500).json({ error: 'Something went wrong!' });
 });
 
 // Start server
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+console.log('Server startup complete');
 
-// Export pool
 export { pool };
