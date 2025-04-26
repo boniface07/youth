@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { Box, TextField, Button, Typography, Container } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
-import { theme } from '../theme';
+import { theme } from '../../theme';
 
 // Ensure no trailing slash in API_BASE_URL
 const API_BASE_URL = import.meta.env.VITE_API_URL?.replace(/\/$/, '') || 'http://localhost:5000';
