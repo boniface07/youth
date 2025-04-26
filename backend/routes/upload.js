@@ -5,12 +5,10 @@ import { fileURLToPath } from 'url';
 
 const uploadRouter = express.Router();
 
-// Get the absolute path to backend/public/images/
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const uploadDir = path.join(__dirname, '..', 'public', 'images');
 
-// Configure multer to store images in backend/public/images/
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
     console.log('[Upload Route] Saving to directory:', uploadDir);
@@ -36,14 +34,13 @@ const upload = multer({
   },
 });
 
-// Handle image upload
 uploadRouter.post('/upload', upload.single('image'), (req, res) => {
   console.log('[Upload Route] Received file:', req.file);
   if (!req.file) {
     console.error('[Upload Route] No file uploaded');
     return res.status(400).json({ message: 'No file uploaded' });
   }
-  const imageUrl = `http://localhost:5000/images/${req.file.filename}`;
+  const imageUrl = `/images/${req.file.filename}`; // Use relative path
   console.log('[Upload Route] Image saved, returning:', imageUrl);
   res.json({ imageUrl });
 });
