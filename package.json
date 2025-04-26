@@ -8,6 +8,7 @@
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",
+    "build-and-copy": "npm run build && npm run copy-dist",
     "start:backend": "node backend/server.js",
     "dev:backend": "node backend/server.js"
   },
