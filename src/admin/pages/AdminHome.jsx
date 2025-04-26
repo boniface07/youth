@@ -29,10 +29,25 @@ const API_BASE_URL = (import.meta.env.VITE_API_URL || 'http://localhost:5000')
   .replace(/\/+$/, '')
   .trim();
 
+console.log('[AdminHome] Raw VITE_API_URL:', import.meta.env.VITE_API_URL);
+console.log('[AdminHome] Normalized API_BASE_URL:', API_BASE_URL);
+
 const validationSchema = Yup.object({
   heroTitle: Yup.string().required('Hero Title is required').max(100, 'Title must be 100 characters or less'),
   heroSubtitle: Yup.string().required('Hero Subtitle is required').max(1000, 'Subtitle must be 1000 characters or less'),
-  heroImage: Yup.string().required('Hero Image is required').url('Must be a valid URL'),
+  heroImage: Yup.string()
+    .required('Hero Image is required')
+    .test('is-valid-url', 'Must be a valid URL', (value) => {
+      // Allow empty or null during file selection
+      if (!value) return false;
+      // Validate URL format
+      try {
+        new URL(value);
+        return true;
+      } catch {
+        return false;
+      }
+    }),
 });
 
 // Strip HTML tags for submission
@@ -41,6 +56,13 @@ const stripHtmlTags = (html) => {
   const parser = new DOMParser();
   const doc = parser.parseFromString(html, 'text/html');
   return doc.body.textContent || '';
+};
+
+// Normalize URL helper
+const normalizeUrl = (base, path) => {
+  const url = `${base}/${path}`.replace(/\/+/g, '/').replace(':/', '://');
+  console.log('[AdminHome] Normalized URL:', url);
+  return url;
 };
 
 const AdminHome = () => {
@@ -57,12 +79,11 @@ const AdminHome = () => {
   useEffect(() => {
     const fetchContent = async () => {
       setLoading(true);
-      const url = `${API_BASE_URL}/api/home`.replace(/\/+/g, '/').replace(':/', '://');
-      console.log('[AdminHome] Fetching content from:', url);
-
+      const url = normalizeUrl(API_BASE_URL, 'api/home');
       try {
         const response = await axios.get(url, {
           headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+          timeout: 10000,
         });
         console.log('[AdminHome] API response:', response.data);
         if (!response.data || Object.keys(response.data).length === 0) {
@@ -97,18 +118,25 @@ const AdminHome = () => {
     }
     const formData = new FormData();
     formData.append('image', file);
-    const url = `${API_BASE_URL}/api/upload`.replace(/\/+/g, '/').replace(':/', '://');
-    console.log('[AdminHome] Uploading image to:', url);
-
+    const url = normalizeUrl(API_BASE_URL, 'api/upload');
     try {
+      console.log('[AdminHome] Uploading to:', url, 'File:', file.name);
       const response = await axios.post(url, formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
           Authorization: `Bearer ${localStorage.getItem('token')}`,
         },
+        timeout: 10000,
       });
       console.log('[AdminHome] Image upload response:', response.data);
-      return response.data.imageUrl;
+      const imageUrl = response.data.imageUrl;
+      // Validate returned URL
+      try {
+        new URL(imageUrl);
+        return imageUrl;
+      } catch {
+        throw new Error('Invalid image URL returned from server');
+      }
     } catch (error) {
       console.error('[AdminHome] Image upload error:', {
         message: error.message,
@@ -122,9 +150,7 @@ const AdminHome = () => {
   // Handle form submission
   const handleSubmit = async (values, { setSubmitting }) => {
     setLoading(true);
-    const url = `${API_BASE_URL}/api/home`.replace(/\/+/g, '/').replace(':/', '://');
-    console.log('[AdminHome] Submitting to:', url);
-
+    const url = normalizeUrl(API_BASE_URL, 'api/home');
     try {
       const cleanedTitle = stripHtmlTags(values.heroTitle);
       const cleanedSubtitle = stripHtmlTags(values.heroSubtitle);
@@ -133,7 +159,6 @@ const AdminHome = () => {
         description: cleanedSubtitle,
         image_url: values.heroImage,
       });
-
       const response = await axios.put(
         url,
         {
@@ -143,6 +168,7 @@ const AdminHome = () => {
         },
         {
           headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+          timeout: 10000,
         }
       );
       console.log('[AdminHome] PUT response:', response.data);
@@ -171,12 +197,11 @@ const AdminHome = () => {
     setResetDialogOpen(true);
     const resetFn = async () => {
       setLoading(true);
-      const url = `${API_BASE_URL}/api/home`.replace(/\/+/g, '/').replace(':/', '://');
-      console.log('[AdminHome] Resetting form, fetching from:', url);
-
+      const url = normalizeUrl(API_BASE_URL, 'api/home');
       try {
         const response = await axios.get(url, {
           headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+          timeout: 10000,
         });
         console.log('[AdminHome] Reset API response:', response.data);
         const values = {
@@ -430,7 +455,7 @@ const AdminHome = () => {
                         maxHeight: 300,
                       }}
                       onError={(e) => {
-                        e.target.src = '/images/placeholder.jpg'; // Fallback image
+                        e.target.src = '/images/placeholder.jpg';
                         console.error('[AdminHome] Hero image load failed:', initialValues.heroImage);
                       }}
                     />

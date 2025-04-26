@@ -1,24 +1,41 @@
+// D:\Exercise\JAVASCRIPT\REACT PROJECT\YOUTH_SPARK\youth_spark_app\src\admin\component\ImageUploader.jsx
 import { useDropzone } from 'react-dropzone';
 import { Box, Typography, Button, IconButton } from '@mui/material';
 import ClearIcon from '@mui/icons-material/Clear';
-import { theme } from '../../theme'; // Adjust the import path as necessary
-import { useState } from 'react';
+import { theme } from '../../theme';
+import { useState, useMemo } from 'react';
 
-const ImageUploader = ({ image, onImageChange, label }) => {
+const ImageUploader = ({ image, onImageChange, label, sx }) => {
   const [error, setError] = useState('');
+
+  // Generate preview URL: File -> URL.createObjectURL, String -> direct URL
+  const previewUrl = useMemo(() => {
+    if (!image) return null;
+    if (typeof image === 'string') {
+      console.log('[ImageUploader] Previewing URL:', image);
+      return image;
+    }
+    if (image instanceof File) {
+      const url = URL.createObjectURL(image);
+      console.log('[ImageUploader] Previewing file:', url);
+      return url;
+    }
+    console.error('[ImageUploader] Invalid image type:', typeof image);
+    return null;
+  }, [image]);
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     accept: {
       'image/jpeg': ['.jpg', '.jpeg'],
       'image/png': ['.png'],
     },
-    maxSize: 5 * 1024 * 1024, // 5MB limit
+    maxSize: 5 * 1024 * 1024, // 5MB
     onDrop: (acceptedFiles) => {
       console.log('[ImageUploader] Files dropped:', acceptedFiles);
       if (acceptedFiles.length > 0) {
         const file = acceptedFiles[0];
-        console.log('[ImageUploader] Selected file:', file);
-        onImageChange(file); // Pass file to AdminHome.jsx
+        console.log('[ImageUploader] Selected file:', file.name);
+        onImageChange(file);
         setError('');
       }
     },
@@ -33,11 +50,15 @@ const ImageUploader = ({ image, onImageChange, label }) => {
     console.log('[ImageUploader] Clearing image');
     onImageChange(null);
     setError('');
+    // Revoke object URL to prevent memory leaks
+    if (previewUrl && previewUrl.startsWith('blob:')) {
+      URL.revokeObjectURL(previewUrl);
+    }
   };
 
   return (
     <Box
-      sx={{ mb: 3, width: '100%' }}
+      sx={{ mb: 3, width: '100%', ...sx }}
       role="region"
       aria-label={`${label} image uploader`}
     >
@@ -70,16 +91,22 @@ const ImageUploader = ({ image, onImageChange, label }) => {
         aria-describedby="image-uploader-desc"
       >
         <input id="image-uploader-input" {...getInputProps()} />
-        {image ? (
+        {previewUrl ? (
           <Box sx={{ position: 'relative', display: 'inline-block' }}>
             <Box
               component="img"
-              src={image}
+              src={previewUrl}
               alt="Uploaded image preview"
               sx={{
                 maxWidth: '100%',
                 maxHeight: { xs: '150px', sm: '200px' },
                 borderRadius: '4px',
+                objectFit: 'cover',
+              }}
+              onError={(e) => {
+                console.error('[ImageUploader] Image load failed:', previewUrl);
+                e.target.src = '/images/placeholder.jpg';
+                setError('Failed to load image preview.');
               }}
             />
             <IconButton
