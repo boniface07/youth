@@ -6,7 +6,8 @@ import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
 import { Link } from 'react-router-dom';
 import { theme } from '../theme';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+// Ensure no trailing slash in API_BASE_URL
+const API_BASE_URL = import.meta.env.VITE_API_URL?.replace(/\/$/, '') || 'http://localhost:5000';
 
 const Home = () => {
   const [content, setContent] = useState(null);
@@ -17,16 +18,17 @@ const Home = () => {
     const fetchData = async () => {
       try {
         console.log('Home: Fetching data from', `${API_BASE_URL}/api/home`);
-        const response = await axios.get(`${API_BASE_URL}/api/home`);
+        const response = await axios.get(`${API_BASE_URL}/api/home`, {
+          withCredentials: true, // Add if using credentials
+        });
         console.log('Home: API response', response.data);
         if (!response.data || Object.keys(response.data).length === 0) {
           throw new Error('No content returned from API');
         }
         setContent({
-          heroTitle: response.data.title ,
-          heroSubtitle: response.data.description ,
-          heroImage:
-            response.data.image_url,
+          heroTitle: response.data.title,
+          heroSubtitle: response.data.description,
+          heroImage: response.data.image_url,
         });
         setError(null);
       } catch (err) {
