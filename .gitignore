@@ -1,4 +1,8 @@
+# Frontend
 node_modules/
-.env
 dist/
-!backend/dist/
+.env
+
+# Backend
+backend/node_modules/
+backend/.env
