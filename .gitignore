@@ -1,3 +1,6 @@
+#
+
+
 # Frontend
 node_modules/
 dist/
@@ -6,3 +9,4 @@ dist/
 # Backend
 backend/node_modules/
 backend/.env
+

@@ -8,7 +8,7 @@ const homeRouter = express.Router();
 const getBaseUrl = (req) => {
   if (process.env.NODE_ENV === 'production') {
     // Use production backend URL from environment variable
-    return process.env.BACKEND_URL || 'https://your-backend-production.up.railway.app';
+    return process.env.VITE_API_URL;
   }
   // Use request protocol and host for local development
   return `${req.protocol}://${req.get('host')}`;
