@@ -71,40 +71,25 @@ const pool = mysql.createPool({
 
 // Middleware
 const allowedOrigins = [
-  'https://youth-spark-frontend-production-38ef.up.railway.app',
-  'https://youth-spark-backend-production-3b2f.up.railway.app',
-  'http://localhost:3000' // For local development
+  'https://youth-spark-frontend-production.up.railway.app', // From the error
+  'https://youth-spark-frontend-production-38ef.up.railway.app', // From your config
+  'http://localhost:3000', // For local development
 ];
 
-app.use(cors({
-  origin: function (origin, callback) {
-    // Allow requests with no origin (like mobile apps or curl requests)
-    if (!origin) return callback(null, true);
-    
-    if (allowedOrigins.indexOf(origin) !== -1) {
-      callback(null, true);
-    } else {
-      callback(new Error('Not allowed by CORS'));
-    }
-  },
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
-}));
-app.use(cors({
-  origin: (origin, callback) => {
-    if (!origin || allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      callback(new Error('Not allowed by CORS'));
-    }
-  },
-}));
+app.use(
+  cors({
+    origin: allowedOrigins,
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+  })
+);
+
 app.use(express.json());
 app.use('/images', express.static(path.join(__dirname, 'public/images')));
 console.log('Serving static images from:', path.join(__dirname, 'public/images'));
 
-// Serve frontend
+// Serve frontend (if backend serves frontend)
 const distPath = path.join(__dirname, 'dist');
 app.use(express.static(distPath));
 console.log('Serving frontend from:', distPath);
