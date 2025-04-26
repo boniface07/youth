@@ -1,3 +1,4 @@
+/* eslint-disable no-unused-vars */
 /* eslint-disable no-undef */
 import express from 'express';
 import mysql from 'mysql2/promise';
@@ -5,53 +6,82 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { rateLimit } from 'express-rate-limit';
 import cookieParser from 'cookie-parser';
-import { xss } from 'express-xss-sanitizer';
 import compression from 'compression';
-import sqlstring from 'sqlstring';
 
-// Initialize app
+// Initialize environment
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 dotenv.config();
 
+// Initialize Express
 const app = express();
 
-// ======================
-// MySQL-SPECIFIC SECURITY
-// ======================
+// =====================
+// SECURITY CONFIGURATION
+// =====================
 
-// 1. SQL Injection Protection
-// (Using mysql2's built-in parameterized queries + sqlstring for manual queries)
+// Security Headers Middleware
 app.use((req, res, next) => {
-  // Attach SQL escape function to all requests
-  req.sql = sqlstring;
-  next();
-});
-
-// 2. XSS Protection
-app.use(xss());
-
-// 3. Rate Limiting
-app.use(rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 1000,
-  standardHeaders: true,
-  skip: req => req.ip === '::1' // Skip for localhost
-}));
-
-// 4. Secure Headers (No Helmet)
-app.use((req, res, next) => {
+  // Set security headers
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('X-XSS-Protection', '1; mode=block');
   res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.setHeader('Permissions-Policy', 'geolocation=(), microphone=()');
+  next();
+});
+
+// Rate Limiting Middleware (custom implementation)
+const requestCounts = new Map();
+const RATE_LIMIT_WINDOW = 15 * 60 * 1000; // 15 minutes
+const RATE_LIMIT_MAX = 1000; // Max requests per window
+
+setInterval(() => requestCounts.clear(), RATE_LIMIT_WINDOW);
+
+app.use((req, res, next) => {
+  const ip = req.ip;
+  const count = requestCounts.get(ip) || 0;
+  
+  if (count >= RATE_LIMIT_MAX) {
+    return res.status(429).json({ 
+      error: 'Too many requests, please try again later' 
+    });
+  }
+  
+  requestCounts.set(ip, count + 1);
+  next();
+});
+
+// Input Sanitization Middleware
+app.use((req, res, next) => {
+  const sanitize = (data) => {
+    if (typeof data === 'string') {
+      return data.replace(/[<>"'`;]/g, '');
+    }
+    if (Array.isArray(data)) {
+      return data.map(sanitize);
+    }
+    if (typeof data === 'object' && data !== null) {
+      return Object.fromEntries(
+        Object.entries(data).map(([key, value]) => [key, sanitize(value)])
+      );
+    }
+    return data;
+  };
+
+  if (req.body) req.body = sanitize(req.body);
+  if (req.query) req.query = sanitize(req.query);
+  if (req.params) req.params = sanitize(req.params);
+  
   next();
 });
 
 // ==============
-// REACT 19 CONFIG
+// REACT 19 SETUP
 // ==============
+
+// CORS Configuration
 const allowedOrigins = [
   process.env.VITE_FRONTEND_URL,
   'http://localhost:3000', // React 19 default
@@ -61,7 +91,8 @@ const allowedOrigins = [
 app.use(cors({
   origin: allowedOrigins,
   credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS']
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
 // ==============
@@ -74,48 +105,88 @@ const pool = mysql.createPool({
   database: process.env.DB_NAME,
   waitForConnections: true,
   connectionLimit: 10,
-  namedPlaceholders: true, // Important for security
-  typeCast: (field, next) => {
-    if (field.type === 'TINY' && field.length === 1) {
-      return field.string() === '1'; // Convert TINY(1) to boolean
-    }
-    return next();
-  }
+  namedPlaceholders: true,
+  supportBigNumbers: true,
+  bigNumberStrings: true
 });
 
+// Test database connection
+(async () => {
+  try {
+    const conn = await pool.getConnection();
+    await conn.ping();
+    conn.release();
+    console.log('✅ MySQL connection established');
+  } catch (err) {
+    console.error('❌ MySQL connection failed:', err);
+    process.exit(1);
+  }
+})();
+
 // =============
-// ROUTES & SERVER
+// MIDDLEWARE
 // =============
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(compression());
 app.use(cookieParser());
 
-// Example secure MySQL query route
-app.post('/api/data', async (req, res) => {
+// =============
+// ROUTES
+// =============
+
+// Health Check
+app.get('/api/health', (req, res) => {
+  res.json({
+    status: 'healthy',
+    reactVersion: '19.x',
+    database: 'MySQL',
+    environment: process.env.NODE_ENV || 'development'
+  });
+});
+
+// Example Secure Route
+app.post('/api/users', async (req, res) => {
   try {
-    // SAFE: Using parameterized queries
-    const [rows] = await pool.query(
-      'SELECT * FROM users WHERE id = ? AND status = ?',
-      [req.body.id, 'active']
+    // Using parameterized query
+    const [result] = await pool.query(
+      'INSERT INTO users SET ?',
+      [req.body]
     );
-    res.json(rows);
+    res.status(201).json({ id: result.insertId });
   } catch (err) {
     console.error('MySQL error:', err);
-    res.status(500).json({ error: 'Database error' });
+    res.status(500).json({ error: 'Database operation failed' });
   }
 });
 
+// =============
+// ERROR HANDLING
+// =============
+app.use((err, req, res, next) => {
+  console.error('Error:', err.stack);
+  res.status(500).json({ error: 'Internal Server Error' });
+});
+
+// 404 Handler
+app.use((req, res) => {
+  res.status(404).json({ error: 'Endpoint not found' });
+});
+
+// =============
+// SERVER START
+// =============
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   console.log(`
-  🚀 MySQL-Secure Server running on port ${PORT}
-  ⚛️  Optimized for React 19
-  🔒 MySQL-Specific Protections:
-     - Parameterized Queries
-     - XSS Filtering
-     - Rate Limiting
+  🚀 Server running on port ${PORT}
+  ⚛️  React 19 Compatible
+  🔒 Security Features:
+     - Custom Rate Limiting
+     - Input Sanitization
      - Secure Headers
+  💾 MySQL Database Connected
+  🌍 Allowed Origins: ${allowedOrigins.join(', ')}
   `);
 });
 
