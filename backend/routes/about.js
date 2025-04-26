@@ -37,61 +37,6 @@ const sanitizeOptions = {
   allowedSchemes: ['https'],
 };
 
-// Initialize database schema
-const initializeSchema = async () => {
-  try {
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS about (
-        id INT PRIMARY KEY,
-        vision TEXT,
-        mission TEXT,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      );
-      CREATE TABLE IF NOT EXISTS mission_points (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        about_id INT,
-        point VARCHAR(500),
-        \`order\` INT,
-        FOREIGN KEY (about_id) REFERENCES about(id)
-      );
-      CREATE TABLE IF NOT EXISTS history_points (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        about_id INT,
-        point VARCHAR(500),
-        \`order\` INT,
-        FOREIGN KEY (about_id) REFERENCES about(id)
-      );
-    `);
-    console.log('Database schema initialized');
-
-    // Insert default data if table is empty
-    const [aboutRows] = await pool.query('SELECT id FROM about WHERE id = 1');
-    if (aboutRows.length === 0) {
-      await pool.query(
-        'INSERT INTO about (id, vision, mission) VALUES (1, ?, ?)',
-        ['<p>Empowering youth through innovation</p>', '<p>Building a brighter future</p>']
-      );
-      await pool.query(
-        'INSERT INTO mission_points (about_id, point, `order`) VALUES (?, ?, ?), (?, ?, ?)',
-        [1, 'Foster creativity', 1, 1, 'Support education', 2]
-      );
-      await pool.query(
-        'INSERT INTO history_points (about_id, point, `order`) VALUES (?, ?, ?), (?, ?, ?)',
-        [1, 'Founded in 2020', 1, 1, 'Launched first program in 2021', 2]
-      );
-      console.log('Default about data inserted');
-    }
-  } catch (error) {
-    console.error('Error initializing schema:', error);
-    throw error;
-  }
-};
-
-// Run schema initialization on startup
-initializeSchema().catch((err) => {
-  console.error('Failed to initialize database schema:', err);
-  process.exit(1);
-});
 
 // GET /api/about - Fetch about data
 aboutRouter.get('/about', async (req, res) => {
