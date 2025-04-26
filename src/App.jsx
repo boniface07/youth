@@ -241,7 +241,11 @@ function MainApp() {
               },
             }}
           >
-            <NavLink to="/" style={{ display: 'flex', alignItems: 'center' }}>
+            <NavLink
+              to="/"
+              className="logo-link"
+              style={{ display: 'flex', alignItems: 'center', textDecoration: 'none' }}
+            >
               <img
                 src="/logo.png"
                 alt="Youth Spark Foundation Logo"
@@ -265,6 +269,8 @@ function MainApp() {
                     WebkitBackgroundClip: 'text',
                     backgroundClip: 'text',
                     color: 'transparent',
+                    '&:hover': { textDecoration: 'none' },
+                    '&:active': { textDecoration: 'none' },
                   }}
                 >
                   Youth Spark
@@ -277,6 +283,8 @@ function MainApp() {
                     fontWeight: 400,
                     letterSpacing: '0.1em',
                     textDecoration: 'none',
+                    '&:hover': { textDecoration: 'none' },
+                    '&:active': { textDecoration: 'none' },
                   }}
                 >
                   FOUNDATION
@@ -527,6 +535,18 @@ function MainApp() {
             0% { transform: scale(1) rotate(0deg); }
             50% { transform: scale(1.1) rotate(5deg); }
             100% { transform: scale(1) rotate(0deg); }
+          }
+          .logo-link {
+            text-decoration: none !important;
+          }
+          .logo-link:hover,
+          .logo-link:active,
+          .logo-link:focus {
+            text-decoration: none !important;
+          }
+          .logo-link::after,
+          .logo-link:hover::after {
+            content: none !important;
           }
         `}
       </style>
