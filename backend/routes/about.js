@@ -13,13 +13,18 @@ const verifyToken = (req, res, next) => {
     return res.status(401).json({ error: 'No token provided' });
   }
 
+  if (!process.env.JWT_SECRET) {
+    console.error('JWT_SECRET is not defined');
+    return res.status(500).json({ error: 'Server configuration error' });
+  }
+
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your_jwt_secret');
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
     req.user = decoded;
     next();
   } catch (error) {
-    console.error('Token verification error:', error);
-    res.status(403).json({ error: 'Invalid token' });
+    console.error('Token verification error:', error.message);
+    return res.status(403).json({ error: 'Invalid token' });
   }
 };
 
@@ -29,10 +34,68 @@ const sanitizeOptions = {
   allowedAttributes: {
     img: ['src', 'alt'],
   },
+  allowedSchemes: ['https'],
 };
+
+// Initialize database schema
+const initializeSchema = async () => {
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS about (
+        id INT PRIMARY KEY,
+        vision TEXT,
+        mission TEXT,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE TABLE IF NOT EXISTS mission_points (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        about_id INT,
+        point VARCHAR(500),
+        \`order\` INT,
+        FOREIGN KEY (about_id) REFERENCES about(id)
+      );
+      CREATE TABLE IF NOT EXISTS history_points (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        about_id INT,
+        point VARCHAR(500),
+        \`order\` INT,
+        FOREIGN KEY (about_id) REFERENCES about(id)
+      );
+    `);
+    console.log('Database schema initialized');
+
+    // Insert default data if table is empty
+    const [aboutRows] = await pool.query('SELECT id FROM about WHERE id = 1');
+    if (aboutRows.length === 0) {
+      await pool.query(
+        'INSERT INTO about (id, vision, mission) VALUES (1, ?, ?)',
+        ['<p>Empowering youth through innovation</p>', '<p>Building a brighter future</p>']
+      );
+      await pool.query(
+        'INSERT INTO mission_points (about_id, point, `order`) VALUES (?, ?, ?), (?, ?, ?)',
+        [1, 'Foster creativity', 1, 1, 'Support education', 2]
+      );
+      await pool.query(
+        'INSERT INTO history_points (about_id, point, `order`) VALUES (?, ?, ?), (?, ?, ?)',
+        [1, 'Founded in 2020', 1, 1, 'Launched first program in 2021', 2]
+      );
+      console.log('Default about data inserted');
+    }
+  } catch (error) {
+    console.error('Error initializing schema:', error);
+    throw error;
+  }
+};
+
+// Run schema initialization on startup
+initializeSchema().catch((err) => {
+  console.error('Failed to initialize database schema:', err);
+  process.exit(1);
+});
 
 // GET /api/about - Fetch about data
 aboutRouter.get('/about', async (req, res) => {
+  console.log('GET /api/about called');
   try {
     const [aboutRows] = await pool.query('SELECT * FROM about WHERE id = 1');
     const [missionPoints] = await pool.query(
@@ -41,6 +104,11 @@ aboutRouter.get('/about', async (req, res) => {
     const [historyPoints] = await pool.query(
       'SELECT point FROM history_points WHERE about_id = 1 ORDER BY `order`'
     );
+    console.log('Fetched data:', {
+      aboutRows: aboutRows[0] || 'No about data',
+      missionPoints: missionPoints.length,
+      historyPoints: historyPoints.length,
+    });
 
     const response = {
       vision: aboutRows[0]?.vision ? sanitizeHtml(aboutRows[0].vision, sanitizeOptions) : '',
@@ -51,7 +119,7 @@ aboutRouter.get('/about', async (req, res) => {
 
     res.json(response);
   } catch (error) {
-    console.error('Error fetching about data:', error);
+    console.error('Error fetching about data:', error.message);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -62,14 +130,14 @@ aboutRouter.put('/about', verifyToken, async (req, res) => {
 
   // Validate input
   if (
-    !vision ||
-    !mission ||
+    !vision?.trim() ||
+    !mission?.trim() ||
     !Array.isArray(missionPoints) ||
     !Array.isArray(historyPoints) ||
     vision.length > 5000 ||
     mission.length > 5000 ||
-    missionPoints.some((p) => p.length > 500) ||
-    historyPoints.some((p) => p.length > 500)
+    missionPoints.some((p) => !p?.trim() || p.length > 500) ||
+    historyPoints.some((p) => !p?.trim() || p.length > 500)
   ) {
     return res.status(400).json({ error: 'Invalid input data' });
   }
@@ -86,18 +154,11 @@ aboutRouter.put('/about', verifyToken, async (req, res) => {
     await connection.beginTransaction();
 
     try {
-      const [aboutRows] = await connection.query('SELECT id FROM about WHERE id = 1');
-      if (aboutRows.length === 0) {
-        await connection.query('INSERT INTO about (id, vision, mission) VALUES (1, ?, ?)', [
-          sanitizedData.vision,
-          sanitizedData.mission,
-        ]);
-      } else {
-        await connection.query(
-          'UPDATE about SET vision = ?, mission = ?, updated_at = NOW() WHERE id = 1',
-          [sanitizedData.vision, sanitizedData.mission]
-        );
-      }
+      await connection.query(
+        'INSERT INTO about (id, vision, mission) VALUES (1, ?, ?) ' +
+        'ON DUPLICATE KEY UPDATE vision = ?, mission = ?, updated_at = NOW()',
+        [sanitizedData.vision, sanitizedData.mission, sanitizedData.vision, sanitizedData.mission]
+      );
 
       await connection.query('DELETE FROM mission_points WHERE about_id = 1');
       if (sanitizedData.missionPoints.length > 0) {
@@ -110,7 +171,7 @@ aboutRouter.put('/about', verifyToken, async (req, res) => {
 
       await connection.query('DELETE FROM history_points WHERE about_id = 1');
       if (sanitizedData.historyPoints.length > 0) {
-        const historyValues = sanitizedData.historyPoints.map((point, index) => [1, point, index + 1]);
+        const historyValues = sanitizedData.missionPoints.map((point, index) => [1, point, index + 1]);
         await connection.query(
           'INSERT INTO history_points (about_id, point, `order`) VALUES ?',
           [historyValues]
@@ -118,15 +179,17 @@ aboutRouter.put('/about', verifyToken, async (req, res) => {
       }
 
       await connection.commit();
+      console.log('About data updated successfully');
       res.json({ message: 'About data updated successfully' });
     } catch (error) {
       await connection.rollback();
+      console.error('Error updating about data:', error.message);
       throw error;
     } finally {
       connection.release();
     }
   } catch (error) {
-    console.error('Error updating about data:', error);
+    console.error('Error updating about data:', error.message);
     res.status(500).json({ error: 'Internal server error' });
   }
 });

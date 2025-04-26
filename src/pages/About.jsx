@@ -7,6 +7,7 @@ import {
   Tab,
   useTheme,
   CircularProgress,
+  Button,
 } from '@mui/material';
 import axios from 'axios';
 import DOMPurify from 'dompurify';
@@ -59,8 +60,9 @@ SectionHeader.propTypes = {
   title: PropTypes.string.isRequired,
   gradient: PropTypes.string.isRequired,
 };
+
 // Ensure no trailing slash in API_BASE_URL
-const API_BASE_URL = import.meta.env.VITE_API_URL?.replace(/\/$/, '');
+const API_BASE_URL = import.meta.env.VITE_API_URL?.replace(/\/$/, '') || 'https://youth-spark-backend-production.up.railway.app';
 
 const About = () => {
   const theme = useTheme();
@@ -75,11 +77,17 @@ const About = () => {
   const [error, setError] = useState(null);
 
   const fetchAboutData = async () => {
+    console.log('Fetching about data from:', `${API_BASE_URL}/api/about`);
+    setIsLoading(true);
+    setError(null);
     try {
-      setIsLoading(true);
       const response = await axios.get(`${API_BASE_URL}/api/about`, {
-                withCredentials: true, // Add if using credentials
-              });
+        timeout: 10000, // 10-second timeout
+      });
+      console.log('Fetch response:', response.data);
+      if (!response.data) {
+        throw new Error('Empty response from server');
+      }
       setAboutData({
         vision: DOMPurify.sanitize(response.data.vision || ''),
         mission: DOMPurify.sanitize(response.data.mission || ''),
@@ -91,7 +99,7 @@ const About = () => {
           : [],
       });
     } catch (err) {
-      console.error('Error fetching about data:', err);
+      console.error('Error fetching about data:', err.response?.data || err.message);
       setError('Failed to load content. Please try again later.');
     } finally {
       setIsLoading(false);
@@ -99,6 +107,7 @@ const About = () => {
   };
 
   useEffect(() => {
+    console.log('API_BASE_URL:', API_BASE_URL);
     fetchAboutData();
   }, []);
 
@@ -112,29 +121,27 @@ const About = () => {
     <Box
       component="section"
       id="about"
-      sx={
-        {
-            width: '100%',
-            py: { xs: 6, sm: 8, md: 10 },
-            px: { xs: 2, sm: 3 },
-            background: theme.palette.background.default,
-            position: 'relative',
-            overflow: 'hidden',
-            mt: 0,
-            '&::before': {
-              content: '""',
-              position: 'absolute',
-              top: -200,
-              right: -200,
-              width: 600,
-              height: 600,
-              borderRadius: '50%',
-              background: `radial-gradient(circle, ${theme.palette.primary.light} 0%, transparent 70%)`,
-              opacity: 0.1,
-              zIndex: 0,
-            },
-          }
-    }
+      sx={{
+        width: '100%',
+        py: { xs: 6, sm: 8, md: 10 },
+        px: { xs: 2, sm: 3 },
+        background: theme.palette.background.default,
+        position: 'relative',
+        overflow: 'hidden',
+        mt: 0,
+        '&::before': {
+          content: '""',
+          position: 'absolute',
+          top: -200,
+          right: -200,
+          width: 600,
+          height: 600,
+          borderRadius: '50%',
+          background: `radial-gradient(circle, ${theme.palette.primary.light} 0%, transparent 70%)`,
+          opacity: 0.1,
+          zIndex: 0,
+        },
+      }}
     >
       <Container maxWidth="lg">
         <Box
@@ -201,9 +208,18 @@ const About = () => {
               <CircularProgress aria-label="Loading content" />
             </Box>
           ) : error ? (
-            <Typography color="error" sx={{ textAlign: 'center' }}>
-              {error}
-            </Typography>
+            <Box sx={{ textAlign: 'center', py: 4 }}>
+              <Typography color="error" sx={{ mb: 2 }}>
+                {error}
+              </Typography>
+              <Button
+                variant="contained"
+                onClick={fetchAboutData}
+                aria-label="Retry loading content"
+              >
+                Retry
+              </Button>
+            </Box>
           ) : (
             <>
               <TabPanel value={activeTab} index={0}>
