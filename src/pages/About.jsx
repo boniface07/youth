@@ -59,6 +59,8 @@ SectionHeader.propTypes = {
   title: PropTypes.string.isRequired,
   gradient: PropTypes.string.isRequired,
 };
+// Ensure no trailing slash in API_BASE_URL
+const API_BASE_URL = import.meta.env.VITE_API_URL?.replace(/\/$/, '');
 
 const About = () => {
   const theme = useTheme();
@@ -75,7 +77,9 @@ const About = () => {
   const fetchAboutData = async () => {
     try {
       setIsLoading(true);
-      const response = await axios.get('/api/about', { timeout: 5000 });
+      const response = await axios.get(`${API_BASE_URL}/api/about`, {
+                withCredentials: true, // Add if using credentials
+              });
       setAboutData({
         vision: DOMPurify.sanitize(response.data.vision || ''),
         mission: DOMPurify.sanitize(response.data.mission || ''),

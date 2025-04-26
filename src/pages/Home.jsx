@@ -7,7 +7,7 @@ import { Link } from 'react-router-dom';
 import { theme } from '../theme';
 
 // Ensure no trailing slash in API_BASE_URL
-const API_BASE_URL = import.meta.env.VITE_API_URL?.replace(/\/$/, '') || 'http://localhost:5000';
+const API_BASE_URL = import.meta.env.VITE_API_URL?.replace(/\/$/, '');
 
 const Home = () => {
   const [content, setContent] = useState(null);
