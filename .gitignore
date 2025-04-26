@@ -1,4 +1,4 @@
 node_modules/
 .env
-# Keep dist/ in backend/ for deployment
-# /dist/ (optional: ignore root dist/ if only using backend/dist/)
+dist/
+!backend/dist/
