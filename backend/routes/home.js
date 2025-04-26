@@ -4,14 +4,18 @@ import { pool } from '../server.js';
 
 const homeRouter = express.Router();
 
-// Helper function to get base URL
+// Helper function to get base URL (remove trailing slash)
 const getBaseUrl = (req) => {
+  let baseUrl;
   if (process.env.NODE_ENV === 'production') {
     // Use production backend URL from environment variable
-    return process.env.VITE_API_URL;
+    baseUrl = process.env.VITE_API_URL || 'https://youth-spark-backend-production.up.railway.app';
+  } else {
+    // Use request protocol and host for local development
+    baseUrl = `${req.protocol}://${req.get('host')}`;
   }
-  // Use request protocol and host for local development
-  return `${req.protocol}://${req.get('host')}`;
+  // Remove trailing slash if present
+  return baseUrl.replace(/\/+$/, '');
 };
 
 // Fetch home content
@@ -40,6 +44,7 @@ homeRouter.get('/home', async (req, res) => {
       imageUrl = imageUrl.replace(/^https?:\/\/[^/]+/, '');
       console.log('[Home Route] Converted image_url to relative:', imageUrl);
     }
+    // Construct full URL, ensuring single slash
     const fullImageUrl = imageUrl ? `${getBaseUrl(req)}${imageUrl}` : null;
 
     res.json({
