@@ -1,5 +1,6 @@
 /* eslint-disable no-unused-vars */
 /* eslint-disable no-undef */
+// D:\Exercise\JAVASCRIPT\REACT PROJECT\YOUTH_SPARK\youth_spark_app\backend\server.js
 import express from 'express';
 import mysql from 'mysql2/promise';
 import cors from 'cors';
@@ -88,10 +89,6 @@ app.use(
 );
 
 app.use(express.json());
-
-// Serve static images
-app.use('/images', express.static(path.join(__dirname, 'public/images')));
-console.log('Serving static images from:', path.join(__dirname, 'public/images'));
 
 // API Routes (must come before static file serving)
 try {

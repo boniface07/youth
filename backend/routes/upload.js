@@ -12,13 +12,21 @@ const uploadRouter = express.Router();
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const uploadDir = path.join(__dirname, '..', 'images'); // Changed to 'images' for consistency
+const uploadDir = path.join(__dirname, '..', 'images'); // backend/images
 
 // Ensure images directory exists
 if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true });
   console.log('[Upload Route] Created images directory:', uploadDir);
 }
+
+// Serve images statically from backend/images
+uploadRouter.use('/images', express.static(uploadDir, {
+  setHeaders: (res) => {
+    res.set('Cache-Control', 'public, max-age=31536000'); // Cache for 1 year
+  },
+}));
+console.log('[Upload Route] Serving static images from:', uploadDir);
 
 // Multer storage configuration
 const storage = multer.diskStorage({
@@ -28,7 +36,7 @@ const storage = multer.diskStorage({
   },
   filename: (req, file, cb) => {
     const ext = path.extname(file.originalname).toLowerCase();
-    const filename = `${uuidv4()}${ext}`; // Use uuid for unique filenames
+    const filename = `${uuidv4()}${ext}`;
     console.log('[Upload Route] Generated filename:', filename);
     cb(null, filename);
   },

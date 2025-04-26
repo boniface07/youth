@@ -1,5 +1,5 @@
 // D:\Exercise\JAVASCRIPT\REACT PROJECT\YOUTH_SPARK\youth_spark_app\src\pages\Home.jsx
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import {
   Box,
@@ -20,50 +20,135 @@ const API_BASE_URL = (import.meta.env.VITE_API_URL || 'http://localhost:5000')
   .replace(/\/+$/, '')
   .trim();
 
+// Default hero image path (served from public folder)
+const DEFAULT_HERO_IMAGE = '/images/default-hero.jpg';
+
+// Custom SEO Component for React 19
+const SEO = ({ title, description, ogTitle, ogDescription, ogImage, ogType = 'website' }) => {
+  useEffect(() => {
+    // Update document title
+    document.title = title;
+
+    // Create or update meta tags
+    const metaTags = [
+      { name: 'description', content: description },
+      { property: 'og:title', content: ogTitle },
+      { property: 'og:description', content: ogDescription },
+      { property: 'og:image', content: ogImage },
+      { property: 'og:type', content: ogType },
+    ];
+
+    metaTags.forEach(({ name, property, content }) => {
+      let meta = name
+        ? document.querySelector(`meta[name="${name}"]`)
+        : document.querySelector(`meta[property="${property}"]`);
+      if (!meta) {
+        meta = document.createElement('meta');
+        if (name) meta.setAttribute('name', name);
+        if (property) meta.setAttribute('property', property);
+        document.head.appendChild(meta);
+      }
+      meta.setAttribute('content', content);
+    });
+
+    // Cleanup on unmount
+    return () => {
+      metaTags.forEach(({ name, property }) => {
+        const meta = name
+          ? document.querySelector(`meta[name="${name}"]`)
+          : document.querySelector(`meta[property="${property}"]`);
+        if (meta && meta.getAttribute('data-react-seo') === 'true') {
+          meta.remove();
+        }
+      });
+    };
+  }, [title, description, ogTitle, ogDescription, ogImage, ogType]);
+
+  return null;
+};
+
+// Component to handle image with fallback
+const ImageWithFallback = ({ src, alt, ...props }) => {
+  const [imgSrc, setImgSrc] = useState(src);
+  const [failedUrls, setFailedUrls] = useState(new Set());
+
+  const handleError = useCallback(() => {
+    if (!failedUrls.has(imgSrc)) {
+      console.error('[Home] Hero image load failed:', imgSrc);
+      setFailedUrls((prev) => new Set(prev).add(imgSrc));
+      setImgSrc(DEFAULT_HERO_IMAGE);
+    }
+  }, [imgSrc, failedUrls]);
+
+  useEffect(() => {
+    if (src !== imgSrc && !failedUrls.has(src)) {
+      setImgSrc(src);
+    }
+  }, [src, imgSrc, failedUrls]);
+
+  return (
+    <Box
+      component="img"
+      src={imgSrc}
+      alt={alt}
+      onError={handleError}
+      loading="lazy"
+      {...props}
+    />
+  );
+};
+
 const Home = () => {
-  const [content, setContent] = useState(null);
+  const [content, setContent] = useState({
+    heroTitle: 'Youth Spark Foundation',
+    heroSubtitle: 'Building a future where Tanzanian youth thrive...',
+    heroImage: DEFAULT_HERO_IMAGE,
+  });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async (retries = 3) => {
     setLoading(true);
     const url = `${API_BASE_URL}/api/home`.replace(/\/+/g, '/').replace(':/', '://');
     console.log('[Home] Fetching data from:', url);
 
-    try {
-      const response = await axios.get(url, {
-        timeout: 10000, // Match AdminHome.jsx
-      });
-      console.log('[Home] API response:', response.data);
-      if (!response.data || Object.keys(response.data).length === 0) {
-        throw new Error('No content returned from API');
+    for (let i = 0; i < retries; i++) {
+      try {
+        const response = await axios.get(url, {
+          timeout: 10000,
+        });
+        console.log('[Home] API response:', response.data);
+        if (!response.data || Object.keys(response.data).length === 0) {
+          throw new Error('No content returned from API');
+        }
+        setContent({
+          heroTitle: response.data.title || 'Youth Spark Foundation',
+          heroSubtitle: response.data.description || 'Building a future where Tanzanian youth thrive...',
+          heroImage: response.data.image_url || DEFAULT_HERO_IMAGE,
+        });
+        setError(null);
+        break;
+      } catch (err) {
+        console.error('[Home] Error fetching home content (attempt', i + 1, '):', {
+          message: err.message,
+          response: err.response?.data,
+          status: err.response?.status,
+        });
+        if (i === retries - 1) {
+          setError(
+            err.response?.data?.message ||
+              'Failed to load content. Please check your connection and try again.'
+          );
+        }
+        await new Promise((resolve) => setTimeout(resolve, 1000)); // Delay before retry
       }
-      setContent({
-        heroTitle: response.data.title || 'Youth Spark Foundation',
-        heroSubtitle: response.data.description || 'Building a future where Tanzanian youth thrive...',
-        heroImage: response.data.image_url || '/images/default-hero.jpg',
-      });
-      setError(null);
-    } catch (err) {
-      console.error('[Home] Error fetching home content:', {
-        message: err.message,
-        response: err.response?.data,
-        status: err.response?.status,
-      });
-      setError(err.response?.data?.message || 'Failed to load content. Please try again.');
-      setContent({
-        heroTitle: 'Youth Spark Foundation',
-        heroSubtitle: 'Building a future where Tanzanian youth thrive...',
-        heroImage: '/images/default-hero.jpg',
-      });
-    } finally {
-      setLoading(false);
     }
-  };
+    setLoading(false);
+  }, []);
 
   useEffect(() => {
     fetchData();
-  }, []);
+  }, [fetchData]);
 
   if (loading) {
     return (
@@ -74,25 +159,15 @@ const Home = () => {
     );
   }
 
-  if (!content) {
-    return (
-      <Container sx={{ textAlign: 'center', py: 4 }}>
-        <Typography>No content available</Typography>
-      </Container>
-    );
-  }
-
   return (
     <>
-      <title>Home - Youth Spark Foundation</title>
-      <meta
-        name="description"
-        content="Welcome to Youth Spark Foundation, empowering Tanzanian youth through education and opportunities."
+      <SEO
+        title="Home - Youth Spark Foundation"
+        description="Welcome to Youth Spark Foundation, empowering Tanzanian youth through education and opportunities."
+        ogTitle={content.heroTitle}
+        ogDescription={content.heroSubtitle}
+        ogImage={content.heroImage}
       />
-      <meta property="og:title" content={content.heroTitle} />
-      <meta property="og:description" content={content.heroSubtitle} />
-      <meta property="og:type" content="website" />
-      <meta property="og:image" content={content.heroImage} />
       {error && (
         <Alert
           severity="error"
@@ -229,8 +304,7 @@ const Home = () => {
                 maxWidth: { xs: '100%', md: '500px' },
               }}
             >
-              <Box
-                component="img"
+              <ImageWithFallback
                 src={content.heroImage}
                 alt="Youth Spark Programs"
                 sx={{
@@ -243,10 +317,6 @@ const Home = () => {
                     transform: 'rotateY(0deg) scale(1.02)',
                     boxShadow: '0 15px 40px rgba(0, 0, 0, 0.4)',
                   },
-                }}
-                onError={(e) => {
-                  e.target.src = '/images/default-hero.jpg';
-                  console.error('[Home] Hero image load failed:', content.heroImage);
                 }}
               />
             </Box>
