@@ -12,7 +12,7 @@ const sanitizeOptions = {
 };
 
 const verifyToken = (req, res, next) => {
-  const token = req.headers['authorization']?.split(' ')[1]; // Expect "Bearer <token>"
+  const token = req.headers['authorization']?.split(' ')[1];
   if (!token) {
     return res.status(401).json({ error: 'No token provided' });
   }
@@ -36,12 +36,18 @@ const verifyToken = (req, res, next) => {
 impactRouter.get('/impact', async (req, res) => {
   console.log('GET /api/impact called');
   try {
+    console.log('Querying stats table...');
     const [statsRows] = await pool.query(
       'SELECT id, value, label, icon, `order` FROM stats ORDER BY `order`'
     );
+    console.log('Stats query successful, rows:', statsRows.length);
+
+    console.log('Querying testimonials table...');
     const [testimonialsRows] = await pool.query(
-      'SELECT id, quote, name, program, avatar, `order` FROM testimonials ORDER BY `order`'
+      'SELECT id, quote, name, program, `order` FROM testimonials ORDER BY `order`'
     );
+    console.log('Testimonials query successful, rows:', testimonialsRows.length);
+
     console.log('Fetched impact data:', {
       stats: statsRows.length,
       testimonials: testimonialsRows.length,
@@ -59,13 +65,13 @@ impactRouter.get('/impact', async (req, res) => {
       quote: sanitizeHtml(testimonial.quote || '', sanitizeOptions),
       name: sanitizeHtml(testimonial.name || 'Anonymous', sanitizeOptions),
       program: sanitizeHtml(testimonial.program || 'Unknown Program', sanitizeOptions),
-      avatar: testimonial.avatar ? sanitizeHtml(testimonial.avatar, sanitizeOptions) : null,
+      avatar: null, // Explicitly set to null since column doesn't exist
     }));
 
     res.set('Cache-Control', 'no-store');
     res.json({ stats: sanitizedStats, testimonials: sanitizedTestimonials });
   } catch (error) {
-    console.error('Error fetching impact data:', error.message);
+    console.error('Error fetching impact data:', error.message, error.stack);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -101,8 +107,7 @@ impactRouter.put('/impact', verifyToken, async (req, res) => {
         !t.program?.trim() ||
         t.name.length > 100 ||
         t.program.length > 100 ||
-        t.quote.length > 5000 ||
-        (t.avatar && t.avatar.length > 255)
+        t.quote.length > 5000
     )
   ) {
     console.error('Invalid testimonials data:', testimonials);
@@ -120,7 +125,6 @@ impactRouter.put('/impact', verifyToken, async (req, res) => {
     quote: sanitizeHtml(t.quote, sanitizeOptions),
     name: sanitizeHtml(t.name, sanitizeOptions),
     program: sanitizeHtml(t.program, sanitizeOptions),
-    avatar: t.avatar ? sanitizeHtml(t.avatar, sanitizeOptions) : null,
     order: index + 1,
   }));
 
@@ -129,11 +133,9 @@ impactRouter.put('/impact', verifyToken, async (req, res) => {
     await connection.beginTransaction();
 
     try {
-      // Clear existing data
       await connection.query('DELETE FROM stats');
       await connection.query('DELETE FROM testimonials');
 
-      // Insert stats
       if (sanitizedStats.length > 0) {
         const statsValues = sanitizedStats.map((s) => [
           s.value,
@@ -147,17 +149,15 @@ impactRouter.put('/impact', verifyToken, async (req, res) => {
         );
       }
 
-      // Insert testimonials
       if (sanitizedTestimonials.length > 0) {
         const testimonialsValues = sanitizedTestimonials.map((t) => [
           t.quote,
           t.name,
           t.program,
-          t.avatar,
           t.order,
         ]);
         await connection.query(
-          'INSERT INTO testimonials (quote, name, program, avatar, `order`) VALUES ?',
+          'INSERT INTO testimonials (quote, name, program, `order`) VALUES ?',
           [testimonialsValues]
         );
       }
@@ -167,15 +167,14 @@ impactRouter.put('/impact', verifyToken, async (req, res) => {
       res.json({ message: 'Impact data updated successfully' });
     } catch (error) {
       await connection.rollback();
-      console.error('Error updating impact data:', error.message);
+      console.error('Error updating impact data:', error.message, error.stack);
       throw error;
     } finally {
       connection.release();
     }
   } catch (error) {
-    console.error('Error updating impact data:', error.message);
+    console.error('Error updating impact data:', error.message, error.stack);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
-
 export default impactRouter;
