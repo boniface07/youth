@@ -70,7 +70,27 @@ const pool = mysql.createPool({
 })();
 
 // Middleware
-const allowedOrigins = [process.env.FRONTEND_URL || 'http://localhost:5173'];
+const allowedOrigins = [
+  'https://youth-spark-frontend-production-38ef.up.railway.app',
+  'https://youth-spark-backend-production-3b2f.up.railway.app',
+  'http://localhost:3000' // For local development
+];
+
+app.use(cors({
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+    
+    if (allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
 app.use(cors({
   origin: (origin, callback) => {
     if (!origin || allowedOrigins.includes(origin)) {
