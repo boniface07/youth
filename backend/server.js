@@ -1,4 +1,3 @@
-/* eslint-disable no-unused-vars */
 /* eslint-disable no-undef */
 import express from 'express';
 import mysql from 'mysql2/promise';
@@ -94,12 +93,23 @@ app.get('*', (req, res) => {
 });
 
 // Routes
-app.use('/api', authRoutes);
-app.use('/api', homeRouter);
-app.use('/api', uploadRouter);
-app.use('/api', aboutRouter);
-app.use('/api', programsRouter);
-app.use('/api', impactRouter);
+try {
+  console.log('Registering auth routes...');
+  app.use('/api', authRoutes);
+  console.log('Registering home routes...');
+  app.use('/api', homeRouter);
+  console.log('Registering upload routes...');
+  app.use('/api', uploadRouter);
+  console.log('Registering about routes...');
+  app.use('/api', aboutRouter);
+  console.log('Registering programs routes...');
+  app.use('/api', programsRouter);
+  console.log('Registering impact routes...');
+  app.use('/api', impactRouter);
+} catch (err) {
+  console.error('Error registering routes:', err);
+  process.exit(1);
+}
 
 // Error handling
 app.use((err, req, res, next) => {
