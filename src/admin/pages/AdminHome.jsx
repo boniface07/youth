@@ -1,4 +1,4 @@
-// D:\Exercise\JAVASCRIPT\REACT PROJECT\YOUTH_SPARK\youth_spark_app\src\admin\pages\AdminHome.jsx
+/* eslint-disable no-unused-vars */
 import { useState, useEffect, useCallback, Suspense, lazy } from 'react';
 import {
   Box,
@@ -24,26 +24,15 @@ import axios from 'axios';
 const TextEditor = lazy(() => import('../component/TextEditor'));
 const ImageUploader = lazy(() => import('../component/ImageUploader'));
 
-// Normalize API_BASE_URL
 const API_BASE_URL = (import.meta.env.VITE_API_URL || 'http://localhost:5000')
   .replace(/\/+$/, '')
   .trim();
-
-// Default hero image path (served from public folder)
 const DEFAULT_HERO_IMAGE = '/images/default-hero.jpg';
 
-console.log('[AdminHome] Raw VITE_API_URL:', import.meta.env.VITE_API_URL);
-console.log('[AdminHome] Normalized API_BASE_URL:', API_BASE_URL);
-
-// Custom SEO Component for React 19
 const SEO = ({ title, description }) => {
   useEffect(() => {
-    // Update document title
     document.title = title;
-
-    // Create or update meta tags
     const metaTags = [{ name: 'description', content: description }];
-
     metaTags.forEach(({ name, content }) => {
       let meta = document.querySelector(`meta[name="${name}"]`);
       if (!meta) {
@@ -53,8 +42,6 @@ const SEO = ({ title, description }) => {
       }
       meta.setAttribute('content', content);
     });
-
-    // Cleanup on unmount
     return () => {
       metaTags.forEach(({ name }) => {
         const meta = document.querySelector(`meta[name="${name}"]`);
@@ -64,11 +51,9 @@ const SEO = ({ title, description }) => {
       });
     };
   }, [title, description]);
-
   return null;
 };
 
-// ImageWithFallback Component
 const ImageWithFallback = ({ src, alt, ...props }) => {
   const [imgSrc, setImgSrc] = useState(src);
   const [failedUrls, setFailedUrls] = useState(new Set());
@@ -99,7 +84,6 @@ const ImageWithFallback = ({ src, alt, ...props }) => {
   );
 };
 
-// Validation Schema
 const validationSchema = Yup.object({
   heroTitle: Yup.string()
     .required('Hero Title is required')
@@ -120,7 +104,6 @@ const validationSchema = Yup.object({
     }),
 });
 
-// Strip HTML tags for submission
 const stripHtmlTags = (html) => {
   if (!html || typeof html !== 'string') return html;
   const parser = new DOMParser();
@@ -128,11 +111,8 @@ const stripHtmlTags = (html) => {
   return doc.body.textContent || '';
 };
 
-// Normalize URL helper
 const normalizeUrl = (base, path) => {
-  const url = `${base}/${path}`.replace(/\/+/g, '/').replace(':/', '://');
-  console.log('[AdminHome] Normalized URL:', url);
-  return url;
+  return `${base}/${path}`.replace(/\/+/g, '/').replace(':/', '://');
 };
 
 const AdminHome = () => {
@@ -145,7 +125,6 @@ const AdminHome = () => {
   const [error, setError] = useState('');
   const [resetDialogOpen, setResetDialogOpen] = useState(false);
 
-  // Fetch content with retries
   const fetchContent = useCallback(async (retries = 3) => {
     setLoading(true);
     const url = normalizeUrl(API_BASE_URL, 'api/home');
@@ -155,16 +134,15 @@ const AdminHome = () => {
           headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
           timeout: 10000,
         });
-        console.log('[AdminHome] API response:', response.data);
         if (!response.data || Object.keys(response.data).length === 0) {
           throw new Error('No content returned from API');
         }
-        const values = {
+        const newValues = {
           heroTitle: response.data.title || '',
           heroSubtitle: response.data.description || '',
           heroImage: response.data.image_url || DEFAULT_HERO_IMAGE,
         };
-        setInitialValues(values);
+        setInitialValues(newValues);
         setError('');
         break;
       } catch (error) {
@@ -178,27 +156,24 @@ const AdminHome = () => {
             `Failed to fetch homepage content: ${error.response?.data?.message || error.message}`
           );
         }
-        await new Promise((resolve) => setTimeout(resolve, 1000)); // Delay before retry
+        await new Promise((resolve) => setTimeout(resolve, 1000));
       }
     }
     setLoading(false);
-  }, []);
+  }, [API_BASE_URL]);
 
   useEffect(() => {
     fetchContent();
   }, [fetchContent]);
 
-  // Handle image upload
   const handleImageUpload = async (file) => {
     if (!file) {
-      console.error('[AdminHome] No file provided for upload');
       throw new Error('No file selected');
     }
     const formData = new FormData();
     formData.append('image', file);
     const url = normalizeUrl(API_BASE_URL, 'api/upload');
     try {
-      console.log('[AdminHome] Uploading to:', url, 'File:', file.name);
       const response = await axios.post(url, formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
@@ -206,7 +181,6 @@ const AdminHome = () => {
         },
         timeout: 10000,
       });
-      console.log('[AdminHome] Image upload response:', response.data);
       const imageUrl = response.data.imageUrl;
       try {
         new URL(imageUrl);
@@ -220,22 +194,18 @@ const AdminHome = () => {
         response: error.response?.data,
         status: error.response?.status,
       });
-      throw new Error(error.response?.data?.message || 'Image upload failed');
+      const errorMessage = error.response?.data?.message || 'Image upload failed';
+      setError(errorMessage);
+      throw new Error(errorMessage);
     }
   };
 
-  // Handle form submission
   const handleSubmit = async (values, { setSubmitting }) => {
     setLoading(true);
     const url = normalizeUrl(API_BASE_URL, 'api/home');
     try {
       const cleanedTitle = stripHtmlTags(values.heroTitle);
       const cleanedSubtitle = stripHtmlTags(values.heroSubtitle);
-      console.log('[AdminHome] Submitting values:', {
-        title: cleanedTitle,
-        description: cleanedSubtitle,
-        image_url: values.heroImage,
-      });
       const response = await axios.put(
         url,
         {
@@ -248,10 +218,9 @@ const AdminHome = () => {
           timeout: 10000,
         }
       );
-      console.log('[AdminHome] PUT response:', response.data);
       setInitialValues({
         heroTitle: cleanedTitle,
-        heroSubtitle: values.heroSubtitle, // Keep HTML for preview
+        heroSubtitle: cleanedSubtitle,
         heroImage: values.heroImage,
       });
       alert('Homepage content updated successfully!');
@@ -271,39 +240,33 @@ const AdminHome = () => {
     }
   };
 
-  // Handle reset
   const handleReset = async (setValues) => {
-    setResetDialogOpen(true);
-    const resetFn = async () => {
-      setLoading(true);
-      const url = normalizeUrl(API_BASE_URL, 'api/home');
-      try {
-        const response = await axios.get(url, {
-          headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
-          timeout: 10000,
-        });
-        console.log('[AdminHome] Reset API response:', response.data);
-        const values = {
-          heroTitle: response.data.title || '',
-          heroSubtitle: response.data.description || '',
-          heroImage: response.data.image_url || DEFAULT_HERO_IMAGE,
-        };
-        setValues(values);
-        setInitialValues(values);
-        setError('');
-      } catch (error) {
-        console.error('[AdminHome] Error resetting content:', {
-          message: error.message,
-          response: error.response?.data,
-          status: error.response?.status,
-        });
-        setError(`Failed to reset content: ${error.response?.data?.message || error.message}`);
-      } finally {
-        setLoading(false);
-        setResetDialogOpen(false);
-      }
-    };
-    return resetFn;
+    setLoading(true);
+    const url = normalizeUrl(API_BASE_URL, 'api/home');
+    try {
+      const response = await axios.get(url, {
+        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+        timeout: 10000,
+      });
+      const values = {
+        heroTitle: response.data.title || '',
+        heroSubtitle: response.data.description || '',
+        heroImage: response.data.image_url || DEFAULT_HERO_IMAGE,
+      };
+      setValues(values);
+      setInitialValues(values);
+      setError('');
+    } catch (error) {
+      console.error('[AdminHome] Error resetting content:', {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status,
+      });
+      setError(`Failed to reset content: ${error.response?.data?.message || error.message}`);
+    } finally {
+      setLoading(false);
+      setResetDialogOpen(false);
+    }
   };
 
   return (
@@ -339,7 +302,6 @@ const AdminHome = () => {
           </Box>
         ) : (
           <Grid container spacing={4}>
-            {/* Form Section */}
             <Grid item xs={12} md={6}>
               <Card
                 sx={{
@@ -400,8 +362,7 @@ const AdminHome = () => {
                               const imageUrl = await handleImageUpload(file);
                               setFieldValue('heroImage', imageUrl);
                             } catch (error) {
-                              setError(error.message);
-                              setFieldValue('heroImage', DEFAULT_HERO_IMAGE);
+                              // Error is already set in handleImageUpload
                             }
                           }}
                           sx={{ mb: 3 }}
@@ -426,7 +387,7 @@ const AdminHome = () => {
                             startIcon={<SaveIcon />}
                             sx={{
                               background: `linear-gradient(135deg, ${theme.palette.primary.main}, ${theme.palette.secondary.main})`,
-                              '&:hover': { transform: 'scale.student(1.05)' },
+                              '&:hover': { transform: 'scale(1.05)' },
                               fontSize: { xs: '0.9rem', sm: '1rem' },
                             }}
                             aria-label="Save changes"
@@ -449,7 +410,6 @@ const AdminHome = () => {
                           </Button>
                         </Box>
 
-                        {/* Reset Confirmation Dialog */}
                         <Dialog
                           open={resetDialogOpen}
                           onClose={() => setResetDialogOpen(false)}
@@ -468,9 +428,7 @@ const AdminHome = () => {
                               Cancel
                             </Button>
                             <Button
-                              onClick={async () => {
-                                await handleReset(setValues)();
-                              }}
+                              onClick={() => handleReset(setValues)}
                               color="primary"
                               autoFocus
                             >
@@ -485,7 +443,6 @@ const AdminHome = () => {
               </Card>
             </Grid>
 
-            {/* Preview Section */}
             <Grid item xs={12} md={6}>
               <Card sx={{ p: 3, height: '100%' }}>
                 <Typography variant="h6" gutterBottom>
@@ -511,7 +468,7 @@ const AdminHome = () => {
                       WebkitBoxOrient: 'vertical',
                     }}
                   >
-                    {initialValues.heroTitle || 'Enter a title...'}
+                    {stripHtmlTags(initialValues.heroTitle) || 'Enter a title...'}
                   </Typography>
                   <Typography
                     variant="h5"
@@ -522,10 +479,9 @@ const AdminHome = () => {
                       WebkitLineClamp: 4,
                       WebkitBoxOrient: 'vertical',
                     }}
-                    dangerouslySetInnerHTML={{
-                      __html: initialValues.heroSubtitle || 'Enter a subtitle...',
-                    }}
-                  />
+                  >
+                    {stripHtmlTags(initialValues.heroSubtitle) || 'Enter a subtitle...'}
+                  </Typography>
                   {initialValues.heroImage ? (
                     <ImageWithFallback
                       src={initialValues.heroImage}

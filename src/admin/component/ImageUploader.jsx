@@ -1,17 +1,24 @@
-// D:\Exercise\JAVASCRIPT\REACT PROJECT\YOUTH_SPARK\youth_spark_app\src\admin\component\ImageUploader.jsx
 import { useDropzone } from 'react-dropzone';
-import { Box, Typography, Button, IconButton } from '@mui/material';
+import { Box, Typography, IconButton } from '@mui/material';
 import ClearIcon from '@mui/icons-material/Clear';
 import { theme } from '../../theme';
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef } from 'react';
 
 const ImageUploader = ({ image, onImageChange, label, sx }) => {
   const [error, setError] = useState('');
+  const failedUrls = useRef(new Set()); // Cache failed URLs
 
-  // Generate preview URL: File -> URL.createObjectURL, String -> direct URL
+  // Generate preview URL
   const previewUrl = useMemo(() => {
-    if (!image) return null;
+    if (!image) {
+      console.log('[ImageUploader] No image provided');
+      return null;
+    }
     if (typeof image === 'string') {
+      if (failedUrls.current.has(image)) {
+        console.log('[ImageUploader] Using fallback for failed URL:', image);
+        return '/images/placeholder.jpg'; // Return fallback for failed URLs
+      }
       console.log('[ImageUploader] Previewing URL:', image);
       return image;
     }
@@ -50,7 +57,6 @@ const ImageUploader = ({ image, onImageChange, label, sx }) => {
     console.log('[ImageUploader] Clearing image');
     onImageChange(null);
     setError('');
-    // Revoke object URL to prevent memory leaks
     if (previewUrl && previewUrl.startsWith('blob:')) {
       URL.revokeObjectURL(previewUrl);
     }
@@ -105,8 +111,11 @@ const ImageUploader = ({ image, onImageChange, label, sx }) => {
               }}
               onError={(e) => {
                 console.error('[ImageUploader] Image load failed:', previewUrl);
-                e.target.src = '/images/placeholder.jpg';
-                setError('Failed to load image preview.');
+                if (typeof image === 'string' && !failedUrls.current.has(image)) {
+                  failedUrls.current.add(image); // Cache failed URL
+                  e.target.src = '/images/default-hero.jpg';
+                  setError('Failed to load image preview.');
+                }
               }}
             />
             <IconButton
