@@ -19,7 +19,7 @@ import { theme } from '../theme';
 const API_BASE_URL = (import.meta.env.VITE_API_URL || 'http://localhost:5000')
   .replace(/\/+$/, '')
   .trim();
-const yourCloudName = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME;
+const yourCloudName = import.meta.env.CLOUDINARY_CLOUD_NAME;
 // Default hero image path (served from Cloudinary)
 const DEFAULT_HERO_IMAGE = `https://res.cloudinary.com/${yourCloudName}/image/upload/v1/youth_spark/default-hero.jpg`;
 
