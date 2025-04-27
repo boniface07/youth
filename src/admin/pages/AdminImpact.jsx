@@ -376,12 +376,18 @@ const AdminImpact = () => {
       console.log('Fetching impact data from:', `${API_BASE_URL}/api/impact`);
       const response = await axios.get(`${API_BASE_URL}/api/impact`, { timeout: 10000 });
       console.log('Raw response.data:', response.data);
+      // Check if response.data is an object and has stats and testimonials arrays
       if (
         !response.data ||
+        typeof response.data !== 'object' ||
         !Array.isArray(response.data.stats) ||
         !Array.isArray(response.data.testimonials)
       ) {
-        console.error('Expected object with stats and testimonials arrays, received:', response.data);
+        console.error(
+          'Expected object with stats and testimonials arrays, received:',
+          response.data
+        );
+        setInitialValues({ stats: [], testimonials: [] });
         throw new Error('Invalid response format: Expected object with stats and testimonials arrays');
       }
       setInitialValues({
@@ -449,12 +455,18 @@ const AdminImpact = () => {
       console.log('Resetting impact data from:', `${API_BASE_URL}/api/impact`);
       const response = await axios.get(`${API_BASE_URL}/api/impact`, { timeout: 10000 });
       console.log('Reset response.data:', response.data);
+      // Check if response.data is an object and has stats and testimonials arrays
       if (
         !response.data ||
+        typeof response.data !== 'object' ||
         !Array.isArray(response.data.stats) ||
         !Array.isArray(response.data.testimonials)
       ) {
-        console.error('Expected object with stats and testimonials arrays, received:', response.data);
+        console.error(
+          'Expected object with stats and testimonials arrays, received:',
+          response.data
+        );
+        setInitialValues({ stats: [], testimonials: [] });
         throw new Error('Invalid response format: Expected object with stats and testimonials arrays');
       }
       const values = {
