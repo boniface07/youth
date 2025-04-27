@@ -15,13 +15,17 @@ import {
   MenuItem,
   Box,
   Card,
+  Alert,
+  Snackbar,
 } from '@mui/material';
-import { Save, Add, Delete } from '@mui/icons-material';
+import { Save, Add, Delete, Refresh } from '@mui/icons-material';
 import { Formik, Form, FieldArray, FastField, useField } from 'formik';
 import * as Yup from 'yup';
 import axios from 'axios';
+import DOMPurify from 'dompurify';
 import debounce from 'lodash/debounce';
 import TextEditor from '../component/TextEditor';
+import { theme } from '../../theme';
 import {
   School as EducationIcon,
   Code as DigitalSkillsIcon,
@@ -89,13 +93,28 @@ const iconMap = {
   Celebration: <CelebrationIcon />,
 };
 
+// Ensure no trailing slash in API_BASE_URL
+const API_BASE_URL = (import.meta.env.VITE_API_URL || 'https://youth-spark-backend-production.up.railway.app')
+  .replace(/\/+$/, '')
+  .trim();
+
 // Validation schema
 const validationSchema = Yup.object({
   programs: Yup.array().of(
     Yup.object({
-      title: Yup.string().required('Title is required').max(255, 'Title must be 255 characters or less'),
-      description: Yup.string().required('Description is required').max(5000, 'Description must be 5000 characters or less'),
-      icon: Yup.string().required('Icon is required'),
+      title: Yup.string()
+        .required('Title is required')
+        .max(255, 'Title must be 255 characters or less')
+        .trim()
+        .test('not-empty', 'Title cannot be empty', (value) => value?.trim().length > 0),
+      description: Yup.string()
+        .required('Description is required')
+        .max(5000, 'Description must be 5000 characters or less')
+        .trim()
+        .test('not-empty', 'Description cannot be empty', (value) => value?.trim().length > 0),
+      icon: Yup.string()
+        .required('Icon is required')
+        .test('not-empty', 'Icon cannot be empty', (value) => value?.trim().length > 0),
     })
   ),
 });
@@ -134,19 +153,8 @@ const iconOptions = [
   { value: 'Celebration', label: 'Youth Events' },
 ];
 
-// Strip HTML for preview and initialization
-const stripHtml = (html) => {
-  try {
-    const div = document.createElement('div');
-    div.innerHTML = html || '';
-    return div.textContent || div.innerText || '';
-  } catch {
-    return html || '';
-  }
-};
-
 // Memoized TextEditorField
-const TextEditorField = memo(({ name, label, sx, isActive }) => {
+const TextEditorField = memo(({ name, label, sx }) => {
   const [field, meta, helpers] = useField(name);
   const debouncedSetValue = useCallback(
     debounce((value) => {
@@ -157,26 +165,14 @@ const TextEditorField = memo(({ name, label, sx, isActive }) => {
 
   return (
     <>
-      {isActive ? (
-        <TextEditor
-          label={label}
-          value={field.value}
-          onChange={debouncedSetValue}
-          sx={sx}
-        />
-      ) : (
-        <TextField
-          label={label}
-          value={stripHtml(field.value)}
-          disabled
-          fullWidth
-          multiline
-          rows={4}
-          sx={sx}
-        />
-      )}
+      <TextEditor
+        label={label}
+        value={field.value}
+        onChange={debouncedSetValue}
+        sx={sx}
+      />
       {meta.touched && meta.error && (
-        <Typography color="error" sx={{ mt: 1 }}>
+        <Typography color="error" sx={{ mt: 1, fontSize: '0.9rem' }}>
           {meta.error}
         </Typography>
       )}
@@ -185,58 +181,59 @@ const TextEditorField = memo(({ name, label, sx, isActive }) => {
 });
 
 // Memoized ProgramForm
-const ProgramForm = memo(({ program, index, remove, setFieldValue, touched, errors, setActiveIndex, activeIndex }) => (
+const ProgramForm = memo(({ program, index, remove, touched, errors }) => (
   <Box
     sx={{
       mb: 2,
       p: 2,
       border: '1px solid #ddd',
       borderRadius: 2,
-      bgcolor: activeIndex === index ? '#f5f5f5' : '#fff',
-      cursor: 'pointer',
+      bgcolor: '#fff',
     }}
-    onClick={() => setActiveIndex(index)}
   >
     <Grid container spacing={2}>
       <Grid item xs={12} sm={6}>
-        <TextField
-          label="Title"
-          value={program.title}
-          onChange={(e) => setFieldValue(`programs.${index}.title`, e.target.value)}
-          fullWidth
-          error={touched.programs?.[index]?.title && !!errors.programs?.[index]?.title}
-          helperText={touched.programs?.[index]?.title && errors.programs?.[index]?.title}
-          sx={{ mb: 2 }}
-          disabled={activeIndex !== index}
-        />
+        <FastField name={`programs.${index}.title`}>
+          {({ field }) => (
+            <TextField
+              label="Title"
+              {...field}
+              fullWidth
+              error={touched.programs?.[index]?.title && !!errors.programs?.[index]?.title}
+              helperText={touched.programs?.[index]?.title && errors.programs?.[index]?.title}
+              sx={{ mb: 2 }}
+            />
+          )}
+        </FastField>
       </Grid>
       <Grid item xs={12} sm={6}>
-        <TextField
-          select
-          label="Icon"
-          value={program.icon}
-          onChange={(e) => setFieldValue(`programs.${index}.icon`, e.target.value)}
-          fullWidth
-          error={touched.programs?.[index]?.icon && !!errors.programs?.[index]?.icon}
-          helperText={touched.programs?.[index]?.icon && errors.programs?.[index]?.icon}
-          sx={{ mb: 2 }}
-          disabled={activeIndex !== index}
-        >
-          {iconOptions.map((option) => (
-            <MenuItem key={option.value} value={option.value}>
-              {option.label}
-            </MenuItem>
-          ))}
-        </TextField>
+        <FastField name={`programs.${index}.icon`}>
+          {({ field }) => (
+            <TextField
+              select
+              label="Icon"
+              {...field}
+              fullWidth
+              error={touched.programs?.[index]?.icon && !!errors.programs?.[index]?.icon}
+              helperText={touched.programs?.[index]?.icon && errors.programs?.[index]?.icon}
+              sx={{ mb: 2 }}
+            >
+              {iconOptions.map((option) => (
+                <MenuItem key={option.value} value={option.value}>
+                  {option.label}
+                </MenuItem>
+              ))}
+            </TextField>
+          )}
+        </FastField>
       </Grid>
       <Grid item xs={12}>
-        <FastField name={`programs.${index}.description`} shouldUpdate={() => activeIndex === index}>
+        <FastField name={`programs.${index}.description`}>
           {() => (
             <TextEditorField
               name={`programs.${index}.description`}
               label="Description"
               sx={{ mb: 2 }}
-              isActive={activeIndex === index}
             />
           )}
         </FastField>
@@ -246,7 +243,6 @@ const ProgramForm = memo(({ program, index, remove, setFieldValue, touched, erro
           onClick={() => remove(index)}
           color="error"
           aria-label={`Delete program ${program.title}`}
-          disabled={activeIndex !== index}
         >
           <Delete />
         </IconButton>
@@ -256,7 +252,7 @@ const ProgramForm = memo(({ program, index, remove, setFieldValue, touched, erro
 ));
 
 // Memoized PreviewCard
-const PreviewCard = memo(({ program }) => (
+const PreviewCard = memo(({ program, isActive }) => (
   <Card
     sx={{
       width: '100%',
@@ -265,7 +261,15 @@ const PreviewCard = memo(({ program }) => (
       borderTop: '4px solid #ff3d46',
       borderBottom: '4px solid #4285F4',
       borderRadius: '12px',
-      boxShadow: '0 8px 24px rgba(0, 0, 0, 0.08)',
+      boxShadow: isActive
+        ? '0 12px 28px rgba(0, 0, 0, 0.12)'
+        : '0 8px 24px rgba(0, 0, 0, 0.08)',
+      transition: 'all 0.3s ease',
+      '&:hover': {
+        transform: 'translateY(-8px)',
+        boxShadow: '0 12px 28px rgba(0, 0, 0, 0.12)',
+      },
+      border: isActive ? '2px solid #ff3d46' : 'none',
     }}
   >
     <Box
@@ -299,7 +303,7 @@ const PreviewCard = memo(({ program }) => (
           fontSize: { xs: '1.5rem', sm: '1.6rem' },
         }}
       >
-        {program.title || 'Untitled'}
+        {DOMPurify.sanitize(program.title) || 'Untitled'}
       </Typography>
     </Box>
     <Box sx={{ p: 3, bgcolor: 'white' }}>
@@ -311,7 +315,7 @@ const PreviewCard = memo(({ program }) => (
           lineHeight: 1.7,
         }}
       >
-        {stripHtml(program.description) || 'No description'}
+        {DOMPurify.sanitize(program.description) || 'No description'}
       </Typography>
     </Box>
   </Card>
@@ -321,31 +325,93 @@ const AdminPrograms = () => {
   const [initialValues, setInitialValues] = useState({ programs: [] });
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [success, setSuccess] = useState(null);
   const [openDialog, setOpenDialog] = useState(false);
+  const [resetDialogOpen, setResetDialogOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
 
-  useEffect(() => {
-    const fetchPrograms = async () => {
-      try {
-        setIsLoading(true);
-        const response = await axios.get('/api/programs', { timeout: 5000 });
-        // Strip HTML from descriptions on fetch as a fallback
-        const sanitizedPrograms = response.data.map(program => ({
-          ...program,
-          description: stripHtml(program.description),
-        }));
-        setInitialValues({ programs: sanitizedPrograms });
-      } catch (err) {
-        console.error('Error fetching programs:', err);
-        setError('Failed to load programs. Please try again.');
-      } finally {
-        setIsLoading(false);
+  const fetchPrograms = async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const response = await axios.get(`${API_BASE_URL}/api/programs`, { timeout: 10000 });
+      if (!response.data || !Array.isArray(response.data)) {
+        throw new Error('Invalid response from server');
       }
-    };
+      setInitialValues({ programs: response.data });
+    } catch (err) {
+      console.error('Error fetching programs:', err);
+      setError('Failed to load programs. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
     fetchPrograms();
   }, []);
 
-  if (isLoading) {
+  const handleSubmit = async (values, { setSubmitting }) => {
+    const token = localStorage.getItem('token');
+    if (!token) {
+      setError('Please log in to save changes.');
+      setSubmitting(false);
+      return;
+    }
+    setOpenDialog(true);
+    setSubmitting(false);
+  };
+
+  const confirmSubmit = async (values) => {
+    setIsLoading(true);
+    setError(null);
+    setSuccess(null);
+    try {
+      await axios.put(`${API_BASE_URL}/api/programs`, values.programs, {
+        timeout: 10000,
+        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+      });
+      setInitialValues(values);
+      setSuccess('Programs updated successfully!');
+      setOpenDialog(false);
+    } catch (err) {
+      console.error('Error saving programs:', err);
+      const errorMessage = err.response?.data?.error || 'Failed to save changes. Please try again.';
+      setError(errorMessage);
+      if (err.response?.status === 401 || err.response?.status === 403) {
+        setError('Session expired. Please log in again.');
+        // Optionally redirect to login page
+        // window.location.href = '/login';
+      }
+      setOpenDialog(false);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleReset = async (setValues) => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const response = await axios.get(`${API_BASE_URL}/api/programs`, { timeout: 10000 });
+      if (!response.data || !Array.isArray(response.data)) {
+        throw new Error('Invalid response from server');
+      }
+      const values = { programs: response.data };
+      setValues(values);
+      setInitialValues(values);
+    } catch (err) {
+      console.error('Error resetting programs:', err);
+      setError('Failed to reset programs. Please try again.');
+    } finally {
+      setIsLoading(false);
+      setResetDialogOpen(false);
+    }
+  };
+
+  const gradient = `linear-gradient(90deg, ${theme.palette.primary.main}, ${theme.palette.secondary.main})`;
+
+  if (isLoading && !initialValues.programs.length) {
     return (
       <Container maxWidth="xl" sx={{ py: 4, textAlign: 'center' }}>
         <CircularProgress aria-label="Loading editor" />
@@ -359,14 +425,32 @@ const AdminPrograms = () => {
         variant="h1"
         component="h1"
         gutterBottom
-        sx={{ mb: 4, fontSize: { xs: '2rem', md: '3rem' } }}
+        sx={{
+          mb: 4,
+          fontSize: { xs: '2rem', md: '3rem' },
+          background: gradient,
+          WebkitBackgroundClip: 'text',
+          WebkitTextFillColor: 'transparent',
+        }}
       >
         Programs Editor
       </Typography>
       {error && (
-        <Typography color="error" sx={{ mb: 2 }}>
+        <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
           {error}
-        </Typography>
+        </Alert>
+      )}
+      {success && (
+        <Snackbar
+          open={!!success}
+          autoHideDuration={6000}
+          onClose={() => setSuccess(null)}
+          anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+        >
+          <Alert severity="success" onClose={() => setSuccess(null)}>
+            {success}
+          </Alert>
+        </Snackbar>
       )}
       <Grid container spacing={4}>
         <Grid item xs={12} md={6}>
@@ -374,13 +458,10 @@ const AdminPrograms = () => {
             <Formik
               initialValues={initialValues}
               validationSchema={validationSchema}
-              onSubmit={(values, { setSubmitting }) => {
-                setOpenDialog(true);
-                setSubmitting(false);
-              }}
+              onSubmit={handleSubmit}
               enableReinitialize
             >
-              {({ values, setFieldValue, errors, touched, isSubmitting }) => (
+              {({ values, setFieldValue, errors, touched, isSubmitting, setValues }) => (
                 <Form aria-label="Programs editor form">
                   <FieldArray name="programs">
                     {({ push, remove }) => (
@@ -394,8 +475,6 @@ const AdminPrograms = () => {
                             setFieldValue={setFieldValue}
                             touched={touched}
                             errors={errors}
-                            setActiveIndex={setActiveIndex}
-                            activeIndex={activeIndex}
                           />
                         ))}
                         <Button
@@ -416,62 +495,103 @@ const AdminPrograms = () => {
                       </>
                     )}
                   </FieldArray>
-                  <Button
-                    type="submit"
-                    variant="contained"
-                    color="primary"
-                    startIcon={<Save />}
-                    disabled={isSubmitting}
-                    sx={{ mt: 2 }}
-                    aria-label="Save changes"
-                  >
-                    Save Changes
-                  </Button>
+                  <Box sx={{ display: 'flex', gap: 2, mt: 2 }}>
+                    <Button
+                      type="submit"
+                      variant="contained"
+                      color="primary"
+                      startIcon={<Save />}
+                      disabled={isSubmitting || isLoading}
+                      sx={{
+                        background: gradient,
+                        '&:hover': { transform: 'scale(1.05)' },
+                      }}
+                      aria-label="Save changes"
+                    >
+                      Save Changes
+                    </Button>
+                    <Button
+                      variant="outlined"
+                      startIcon={<Refresh />}
+                      onClick={() => setResetDialogOpen(true)}
+                      disabled={isSubmitting || isLoading}
+                      sx={{
+                        borderColor: theme.palette.border.main,
+                        color: theme.palette.text.primary,
+                      }}
+                      aria-label="Reset form"
+                    >
+                      Reset
+                    </Button>
+                  </Box>
                   <Dialog open={openDialog} onClose={() => setOpenDialog(false)}>
                     <DialogTitle>Confirm Changes</DialogTitle>
-                    <DialogContent>Are you sure you want to save these changes?</DialogContent>
+                    <DialogContent>
+                      <Typography>Are you sure you want to save these changes?</Typography>
+                    </DialogContent>
                     <DialogActions>
-                      <Button onClick={() => setOpenDialog(false)} disabled={isSubmitting}>
+                      <Button onClick={() => setOpenDialog(false)} disabled={isLoading}>
                         Cancel
                       </Button>
                       <Button
-                        onClick={async () => {
-                          try {
-                            console.log('Saving programs:', values.programs);
-                            await axios.put('/api/programs', values.programs, {
-                              timeout: 5000,
-                              headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
-                            });
-                            setOpenDialog(false);
-                            alert('Programs updated successfully!');
-                          } catch (err) {
-                            console.error('Error saving programs:', err);
-                            setError(err.response?.data?.error || 'Failed to save changes. Please try again.');
-                          }
-                        }}
+                        onClick={() => confirmSubmit(values)}
                         color="primary"
-                        disabled={isSubmitting}
+                        disabled={isLoading}
+                        autoFocus
                       >
-                        Save
+                        {isLoading ? <CircularProgress size={24} /> : 'Save'}
                       </Button>
                     </DialogActions>
                   </Dialog>
-                  {/* Preview inside Formik */}
-                  <Grid item xs={12} md={6} sx={{ mt: { xs: 4, md: 0 } }}>
-                    <Typography variant="h6" gutterBottom>
-                      Preview
-                    </Typography>
-                    {activeIndex !== null && values.programs[activeIndex] ? (
-                      <PreviewCard program={values.programs[activeIndex]} />
-                    ) : (
-                      <Typography color="textSecondary">
-                        Select a program to preview
+                  <Dialog open={resetDialogOpen} onClose={() => setResetDialogOpen(false)}>
+                    <DialogTitle>Confirm Reset</DialogTitle>
+                    <DialogContent>
+                      <Typography>
+                        Are you sure you want to reset the form? This will discard unsaved changes and reload the saved content.
                       </Typography>
-                    )}
-                  </Grid>
+                    </DialogContent>
+                    <DialogActions>
+                      <Button onClick={() => setResetDialogOpen(false)} disabled={isLoading}>
+                        Cancel
+                      </Button>
+                      <Button
+                        onClick={() => handleReset(setValues)}
+                        color="primary"
+                        disabled={isLoading}
+                        autoFocus
+                      >
+                        {isLoading ? <CircularProgress size={24} /> : 'Reset'}
+                      </Button>
+                    </DialogActions>
+                  </Dialog>
                 </Form>
               )}
             </Formik>
+          </Paper>
+        </Grid>
+        <Grid item xs={12} md={6}>
+          <Paper sx={{ p: 4, borderRadius: 2, boxShadow: 2 }}>
+            <Typography variant="h6" gutterBottom>
+              Preview
+            </Typography>
+            {initialValues.programs.length === 0 ? (
+              <Typography color="textSecondary">No programs to preview</Typography>
+            ) : (
+              <Grid container spacing={3} justifyContent="center">
+                {initialValues.programs.map((program, index) => (
+                  <Grid
+                    item
+                    xs={12}
+                    sm={6}
+                    md={4}
+                    key={index}
+                    sx={{ display: 'flex', justifyContent: 'center' }}
+                  >
+                    <PreviewCard program={program} isActive={index === activeIndex} />
+                  </Grid>
+                ))}
+              </Grid>
+            )}
           </Paper>
         </Grid>
       </Grid>
