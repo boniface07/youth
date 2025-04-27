@@ -28,7 +28,10 @@ const ImageUploader = lazy(() => import('../component/ImageUploader'));
 const API_BASE_URL = (import.meta.env.VITE_API_URL || 'http://localhost:5000')
   .replace(/\/+$/, '')
   .trim();
-const DEFAULT_HERO_IMAGE = '/images/default-hero.jpg';
+
+  const yourCloudName = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME;
+  // Default hero image path (served from Cloudinary)
+  const DEFAULT_HERO_IMAGE = `https://res.cloudinary.com/${yourCloudName}/image/upload/v1/youth_spark/default-hero.jpg`;
 
 const SEO = ({ title, description }) => {
   useEffect(() => {
