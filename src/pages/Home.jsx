@@ -20,11 +20,10 @@ const API_BASE_URL = (import.meta.env.VITE_API_URL || 'http://localhost:5000')
   .replace(/\/+$/, '')
   .trim();
 const yourCloudName = import.meta.env.CLOUDINARY_CLOUD_NAME;
-console.log ('yourCloudName', yourCloudName);
-console.log('API_BASE_URL:', API_BASE_URL);
-console.log('CLOUDINARY_CLOUD_NAME:', yourCloudName);
+
 // Default hero image path (served from Cloudinary)
-const DEFAULT_HERO_IMAGE = `https://res.cloudinary.com/${yourCloudName}/image/upload/v1/youth_spark/default-hero.jpg`;
+const DEFAULT_HERO_IMAGE = `https://res.cloudinary.com/${yourCloudName}/image/upload/v1745746155/youth_spark/images/default-hero_iz8my7.jpg`;
+
 
 // Custom SEO Component for React 19
 const SEO = ({ title, description, ogTitle, ogDescription, ogImage, ogType = 'website' }) => {
@@ -118,6 +117,7 @@ const Home = () => {
           timeout: 10000,
         });
         console.log('[Home] API response:', response.data);
+        console.log('[Home] API response:', response.data.image_url);
         if (!response.data || Object.keys(response.data).length === 0) {
           throw new Error('No content returned from API');
         }

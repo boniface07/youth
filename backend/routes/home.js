@@ -79,9 +79,17 @@ homeRouter.put('/home', verifyToken, async (req, res) => {
       database: process.env.DB_NAME,
     });
 
+    // Check if a record exists
+    const [rows] = await connection.execute('SELECT id FROM home LIMIT 1');
+    if (rows.length === 0) {
+      console.error('[Home Route] No homepage content found to update');
+      return res.status(404).json({ message: 'No homepage content found to update' });
+    }
+
+    // Update the existing record
     await connection.execute(
-      'INSERT INTO home (title, description, image_url) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE title = ?, description = ?, image_url = ?',
-      [cleanedTitle, cleanedDescription, cleanedImageUrl, cleanedTitle, cleanedDescription, cleanedImageUrl]
+      'UPDATE home SET title = ?, description = ?, image_url = ? WHERE id = ?',
+      [cleanedTitle, cleanedDescription, cleanedImageUrl, rows[0].id]
     );
 
     console.log('[Home Route] Content updated:', {
