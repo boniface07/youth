@@ -22,7 +22,7 @@ import { Save as SaveIcon, Refresh as RefreshIcon } from '@mui/icons-material';
 import { theme } from '../../theme';
 import axios from 'axios';
 
-const TextEditor = lazy(() => import('../../component/TextEditor'));
+const TextEditor = lazy(() => import('../component/TextEditor'));
 const ImageUploader = lazy(() => import('../component/ImageUploader'));
 
 const API_BASE_URL = (import.meta.env.VITE_API_URL || 'http://localhost:5000')
