@@ -510,7 +510,7 @@ const AdminHome = () => {
                         borderRadius: '8px',
                         mt: 2,
                         objectFit: 'cover',
-                        maxHeight: 100,
+                        maxHeight: 200,
                       }}
                     />
                   ) : (

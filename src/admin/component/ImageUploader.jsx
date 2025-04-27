@@ -128,7 +128,7 @@ const ImageUploader = ({ label, image, onImageChange, sx }) => {
               alt="Preview"
               onError={handleImageError}
               sx={{
-                width: '100%',
+                width: '50%',
                 height: '200px',
                 objectFit: 'cover',
                 borderRadius: '4px',
