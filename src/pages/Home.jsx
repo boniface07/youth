@@ -104,14 +104,15 @@ const Home = () => {
     heroSubtitle: 'Building a future where Tanzanian youth thrive...',
     heroImage: DEFAULT_HERO_IMAGE,
   });
+
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-
+  
   const fetchData = useCallback(async (retries = 3) => {
     setLoading(true);
     const url = `${API_BASE_URL}/api/home`.replace(/\/+/g, '/').replace(':/', '://');
     console.log('[Home] Fetching data from:', url);
-
+    console.log('[Home] Hero image URL:', content.heroImage);
     for (let i = 0; i < retries; i++) {
       try {
         const response = await axios.get(url, {

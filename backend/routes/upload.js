@@ -12,7 +12,7 @@ const uploadRouter = express.Router();
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const uploadDir = path.join(__dirname, '..', 'images'); // backend/images
+const uploadDir = path.join(__dirname, '..', 'public', 'images'); // backend/images
 
 // Ensure images directory exists
 if (!fs.existsSync(uploadDir)) {
@@ -32,7 +32,7 @@ console.log('[Upload Route] Serving static images from:', uploadDir);
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
     console.log('[Upload Route] Saving to directory:', uploadDir);
-    cb(null, uploadDir);
+    cb(null, uploadDir); // Ensure this points to public/images if needed
   },
   filename: (req, file, cb) => {
     const ext = path.extname(file.originalname).toLowerCase();

@@ -75,8 +75,6 @@ const pool = mysql.createPool({
 // Middleware
 const allowedOrigins = [
   'https://youth-spark-frontend-production.up.railway.app',
-  'https://youth-spark-frontend-production-38ef.up.railway.app',
-  'http://localhost:3000',
 ];
 
 app.use(
