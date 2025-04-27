@@ -4,25 +4,10 @@ import express from 'express';
 import mysql from 'mysql2/promise';
 import jwt from 'jsonwebtoken';
 import sanitizeHtml from 'sanitize-html';
-import path from 'path';
-import { fileURLToPath } from 'url';
 
 const homeRouter = express.Router();
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-// Correct path to backend/images
-
-const getBaseUrl = (req) => {
-  let baseUrl;
-  if (process.env.NODE_ENV === 'production') {
-    baseUrl = process.env.BACKEND_URL || 'https://youth-spark-backend-production.up.railway.app';
-  } else {
-    baseUrl = `${req.protocol}://${req.get('host')}`;
-  }
-  return baseUrl.replace(/\/+$/, '');
-};
-
+// JWT verification middleware
 const verifyToken = (req, res, next) => {
   const token = req.headers['authorization']?.split(' ')[1];
   if (!token) {
@@ -44,6 +29,7 @@ const verifyToken = (req, res, next) => {
   }
 };
 
+// GET /api/home
 homeRouter.get('/home', async (req, res) => {
   let connection;
   try {
@@ -57,11 +43,7 @@ homeRouter.get('/home', async (req, res) => {
     const homeContent = rows[0] || {};
     console.log('[Home Route] Fetched content:', homeContent);
 
-    let imageUrl = homeContent.image_url || `${getBaseUrl(req)}/images/default-hero.jpg`;
-    // If image_url is relative (e.g., /images/xxx.jpg), prepend base URL
-    if (imageUrl.startsWith('/images/')) {
-      imageUrl = `${getBaseUrl(req)}${imageUrl}`;
-    }
+    const imageUrl = homeContent.image_url || 'https://res.cloudinary.com/your-cloud-name/image/upload/v1/youth_spark/default-hero.jpg';
 
     res.json({
       title: homeContent.title || '',
@@ -76,6 +58,7 @@ homeRouter.get('/home', async (req, res) => {
   }
 });
 
+// PUT /api/home
 homeRouter.put('/home', verifyToken, async (req, res) => {
   const { title, description, image_url } = req.body;
   let connection;
@@ -87,11 +70,7 @@ homeRouter.put('/home', verifyToken, async (req, res) => {
 
     const cleanedTitle = sanitizeHtml(title, { allowedTags: [], allowedAttributes: {} });
     const cleanedDescription = sanitizeHtml(description, { allowedTags: [], allowedAttributes: {} });
-    let cleanedImageUrl = image_url;
-    // If image_url is relative, prepend base URL
-    if (cleanedImageUrl.startsWith('/images/')) {
-      cleanedImageUrl = `${getBaseUrl(req)}${cleanedImageUrl}`;
-    }
+    const cleanedImageUrl = image_url;
 
     connection = await mysql.createConnection({
       host: process.env.DB_HOST,

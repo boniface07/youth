@@ -1,4 +1,5 @@
 /* eslint-disable no-unused-vars */
+// D:\Exercise\JAVASCRIPT\REACT PROJECT\YOUTH_SPARK\youth_spark_app\src\admin\pages\AdminHome.jsx
 import { useState, useEffect, useCallback, Suspense, lazy } from 'react';
 import {
   Box,
@@ -21,7 +22,7 @@ import { Save as SaveIcon, Refresh as RefreshIcon } from '@mui/icons-material';
 import { theme } from '../../theme';
 import axios from 'axios';
 
-const TextEditor = lazy(() => import('../component/TextEditor'));
+const TextEditor = lazy(() => import('../../component/TextEditor'));
 const ImageUploader = lazy(() => import('../component/ImageUploader'));
 
 const API_BASE_URL = (import.meta.env.VITE_API_URL || 'http://localhost:5000')
@@ -142,7 +143,18 @@ const AdminHome = () => {
           heroSubtitle: response.data.description || '',
           heroImage: response.data.image_url || DEFAULT_HERO_IMAGE,
         };
-        setInitialValues(newValues);
+        setInitialValues((prev) => {
+          if (
+            prev.heroTitle === newValues.heroTitle &&
+            prev.heroSubtitle === newValues.heroSubtitle &&
+            prev.heroImage === newValues.heroImage
+          ) {
+            console.log('[AdminHome] No change in initialValues, skipping update');
+            return prev;
+          }
+          console.log('[AdminHome] Updating initialValues:', newValues);
+          return newValues;
+        });
         setError('');
         break;
       } catch (error) {
@@ -160,7 +172,7 @@ const AdminHome = () => {
       }
     }
     setLoading(false);
-  }, [API_BASE_URL]);
+  }, []);
 
   useEffect(() => {
     fetchContent();
@@ -168,12 +180,14 @@ const AdminHome = () => {
 
   const handleImageUpload = async (file) => {
     if (!file) {
+      console.error('[AdminHome] No file provided for upload');
       throw new Error('No file selected');
     }
     const formData = new FormData();
     formData.append('image', file);
     const url = normalizeUrl(API_BASE_URL, 'api/upload');
     try {
+      console.log('[AdminHome] Uploading to:', url, 'File:', file.name);
       const response = await axios.post(url, formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
@@ -181,6 +195,7 @@ const AdminHome = () => {
         },
         timeout: 10000,
       });
+      console.log('[AdminHome] Image upload response:', response.data);
       const imageUrl = response.data.imageUrl;
       try {
         new URL(imageUrl);
@@ -518,5 +533,4 @@ const AdminHome = () => {
     </>
   );
 };
-
 export default AdminHome;

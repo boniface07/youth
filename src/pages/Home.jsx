@@ -20,16 +20,14 @@ const API_BASE_URL = (import.meta.env.VITE_API_URL || 'http://localhost:5000')
   .replace(/\/+$/, '')
   .trim();
 
-// Default hero image path (served from public folder)
-const DEFAULT_HERO_IMAGE = '/images/default-hero.jpg';
+// Default hero image path (served from Cloudinary)
+const DEFAULT_HERO_IMAGE = 'https://res.cloudinary.com/your-cloud-name/image/upload/v1/youth_spark/default-hero.jpg';
 
 // Custom SEO Component for React 19
 const SEO = ({ title, description, ogTitle, ogDescription, ogImage, ogType = 'website' }) => {
   useEffect(() => {
-    // Update document title
     document.title = title;
 
-    // Create or update meta tags
     const metaTags = [
       { name: 'description', content: description },
       { property: 'og:title', content: ogTitle },
@@ -51,7 +49,6 @@ const SEO = ({ title, description, ogTitle, ogDescription, ogImage, ogType = 'we
       meta.setAttribute('content', content);
     });
 
-    // Cleanup on unmount
     return () => {
       metaTags.forEach(({ name, property }) => {
         const meta = name
@@ -140,7 +137,7 @@ const Home = () => {
               'Failed to load content. Please check your connection and try again.'
           );
         }
-        await new Promise((resolve) => setTimeout(resolve, 1000)); // Delay before retry
+        await new Promise((resolve) => setTimeout(resolve, 1000));
       }
     }
     setLoading(false);

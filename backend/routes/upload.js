@@ -2,48 +2,23 @@
 // D:\Exercise\JAVASCRIPT\REACT PROJECT\YOUTH_SPARK\youth_spark_app\backend\routes\upload.js
 import express from 'express';
 import multer from 'multer';
-import path from 'path';
-import { fileURLToPath } from 'url';
+import { v2 as cloudinary } from 'cloudinary';
 import jwt from 'jsonwebtoken';
 import { v4 as uuidv4 } from 'uuid';
-import fs from 'fs';
+import path from 'path';
 
 const uploadRouter = express.Router();
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const uploadDir = path.join(__dirname, '..', 'images'); // backend/images
-
-// Ensure images directory exists
-if (!fs.existsSync(uploadDir)) {
-  fs.mkdirSync(uploadDir, { recursive: true });
-  console.log('[Upload Route] Created images directory:', uploadDir);
-}
-
-// Serve images statically from backend/images
-uploadRouter.use('/images', express.static(uploadDir, {
-  setHeaders: (res) => {
-    res.set('Cache-Control', 'public, max-age=31536000'); // Cache for 1 year
-  },
-}));
-console.log('[Upload Route] Serving static images from:', uploadDir);
-
-// Multer storage configuration
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    console.log('[Upload Route] Saving to directory:', uploadDir);
-    cb(null, uploadDir);
-  },
-  filename: (req, file, cb) => {
-    const ext = path.extname(file.originalname).toLowerCase();
-    const filename = `${uuidv4()}${ext}`;
-    console.log('[Upload Route] Generated filename:', filename);
-    cb(null, filename);
-  },
+// Configure Cloudinary
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 
+// Multer configuration (store in memory, not disk)
 const upload = multer({
-  storage,
+  storage: multer.memoryStorage(),
   limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
   fileFilter: (req, file, cb) => {
     const filetypes = /jpeg|jpg|png/;
@@ -79,30 +54,37 @@ const verifyToken = (req, res, next) => {
   }
 };
 
-// Get base URL
-const getBaseUrl = (req) => {
-  let baseUrl;
-  if (process.env.NODE_ENV === 'production') {
-    baseUrl = process.env.BACKEND_URL || 'https://youth-spark-backend-production.up.railway.app';
-  } else {
-    baseUrl = `${req.protocol}://${req.get('host')}`;
-  }
-  return baseUrl.replace(/\/+$/, '');
-};
-
 // POST /api/upload
-uploadRouter.post('/upload', verifyToken, upload.single('image'), (req, res) => {
+uploadRouter.post('/upload', verifyToken, upload.single('image'), async (req, res) => {
   console.log('[Upload Route] File upload request received:', req.file);
   if (!req.file) {
     console.error('[Upload Route] No file uploaded');
     return res.status(400).json({ message: 'No file uploaded' });
   }
 
-  const relativePath = `/images/${req.file.filename}`;
-  const imageUrl = `${getBaseUrl(req)}${relativePath}`;
-  console.log('[Upload Route] Image uploaded:', { relativePath, imageUrl });
+  try {
+    // Generate a unique filename
+    const ext = path.extname(req.file.originalname).toLowerCase();
+    const filename = `images/${uuidv4()}${ext}`;
 
-  res.json({ imageUrl });
+    // Upload to Cloudinary
+    const uploadStream = cloudinary.uploader.upload_stream(
+      { public_id: filename, folder: 'youth_spark' },
+      (error, result) => {
+        if (error) {
+          console.error('[Upload Route] Cloudinary upload error:', error);
+          return res.status(500).json({ message: 'Failed to upload image' });
+        }
+        const imageUrl = result.secure_url;
+        console.log('[Upload Route] Image uploaded to Cloudinary:', imageUrl);
+        res.json({ imageUrl });
+      }
+    );
+    uploadStream.end(req.file.buffer);
+  } catch (error) {
+    console.error('[Upload Route] Upload error:', error.message);
+    return res.status(500).json({ message: 'Failed to upload image' });
+  }
 });
 
 export default uploadRouter;

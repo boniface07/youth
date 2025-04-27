@@ -1,15 +1,58 @@
-import { useDropzone } from 'react-dropzone';
-import { Box, Typography, IconButton } from '@mui/material';
-import ClearIcon from '@mui/icons-material/Clear';
-import { theme } from '../../theme';
-import { useState, useMemo, useRef } from 'react';
+/* eslint-disable no-unused-vars */
+// D:\Exercise\JAVASCRIPT\REACT PROJECT\YOUTH_SPARK\youth_spark_app\src\admin\component\ImageUploader.jsx
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import {
+  Box,
+  Button,
+  Typography,
+  CircularProgress,
+  IconButton,
+} from '@mui/material';
+import { PhotoCamera as PhotoCameraIcon, Delete as DeleteIcon } from '@mui/icons-material';
+import PropTypes from 'prop-types';
 
-const ImageUploader = ({ image, onImageChange, label, sx }) => {
+const ImageUploader = ({ label, image, onImageChange, sx }) => {
+  const [previewUrl, setPreviewUrl] = useState(null);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const failedUrls = useRef(new Set()); // Cache failed URLs
+  const fileInputRef = useRef(null);
+  const failedUrls = useRef(new Set());
 
-  // Generate preview URL
-  const previewUrl = useMemo(() => {
+  const handleFileChange = useCallback(
+    async (event) => {
+      const file = event.target.files[0];
+      if (!file) {
+        console.log('[ImageUploader] No file selected');
+        return;
+      }
+
+      setLoading(true);
+      setError('');
+
+      try {
+        await onImageChange(file);
+        console.log('[ImageUploader] File selected:', file.name);
+      } catch (err) {
+        console.error('[ImageUploader] Error uploading file:', err.message);
+        setError('Failed to upload image');
+      } finally {
+        setLoading(false);
+        if (fileInputRef.current) {
+          fileInputRef.current.value = '';
+        }
+      }
+    },
+    [onImageChange]
+  );
+
+  const handleRemoveImage = useCallback(() => {
+    console.log('[ImageUploader] Removing image');
+    onImageChange(null);
+    setPreviewUrl(null);
+    setError('');
+  }, [onImageChange]);
+
+  const computedPreviewUrl = useMemo(() => {
     if (!image) {
       console.log('[ImageUploader] No image provided');
       return null;
@@ -17,7 +60,7 @@ const ImageUploader = ({ image, onImageChange, label, sx }) => {
     if (typeof image === 'string') {
       if (failedUrls.current.has(image)) {
         console.log('[ImageUploader] Using fallback for failed URL:', image);
-        return '/images/placeholder.jpg'; // Return fallback for failed URLs
+        return '/images/placeholder.jpg';
       }
       console.log('[ImageUploader] Previewing URL:', image);
       return image;
@@ -31,128 +74,119 @@ const ImageUploader = ({ image, onImageChange, label, sx }) => {
     return null;
   }, [image]);
 
-  const { getRootProps, getInputProps, isDragActive } = useDropzone({
-    accept: {
-      'image/jpeg': ['.jpg', '.jpeg'],
-      'image/png': ['.png'],
-    },
-    maxSize: 5 * 1024 * 1024, // 5MB
-    onDrop: (acceptedFiles) => {
-      console.log('[ImageUploader] Files dropped:', acceptedFiles);
-      if (acceptedFiles.length > 0) {
-        const file = acceptedFiles[0];
-        console.log('[ImageUploader] Selected file:', file.name);
-        onImageChange(file);
-        setError('');
-      }
-    },
-    onDropRejected: (fileRejections) => {
-      console.log('[ImageUploader] Files rejected:', fileRejections);
-      setError('Invalid file. Please upload a JPG or PNG (max 5MB).');
-      onImageChange(null);
-    },
-  });
+  useEffect(() => {
+    setPreviewUrl(computedPreviewUrl);
+  }, [computedPreviewUrl]);
 
-  const handleClear = () => {
-    console.log('[ImageUploader] Clearing image');
-    onImageChange(null);
-    setError('');
-    if (previewUrl && previewUrl.startsWith('blob:')) {
-      URL.revokeObjectURL(previewUrl);
+  useEffect(() => {
+    return () => {
+      if (previewUrl && previewUrl.startsWith('blob:')) {
+        URL.revokeObjectURL(previewUrl);
+        console.log('[ImageUploader] Revoked blob URL:', previewUrl);
+      }
+    };
+  }, [previewUrl]);
+
+  const handleImageError = useCallback(() => {
+    if (image && typeof image === 'string' && !failedUrls.current.has(image)) {
+      console.error('[ImageUploader] Image load failed:', image);
+      failedUrls.current.add(image);
+      setPreviewUrl('/images/placeholder.jpg');
     }
-  };
+  }, [image]);
 
   return (
-    <Box
-      sx={{ mb: 3, width: '100%', ...sx }}
-      role="region"
-      aria-label={`${label} image uploader`}
-    >
-      <Typography
-        variant="h6"
-        component="label"
-        htmlFor="image-uploader-input"
-        sx={{
-          mb: 1,
-          fontWeight: 600,
-          color: theme.palette.text.primary,
-          display: 'block',
-        }}
-      >
-        {label}
-      </Typography>
+    <Box sx={{ ...sx, position: 'relative' }}>
+      {label && (
+        <Typography variant="subtitle1" sx={{ mb: 1, fontWeight: 500 }}>
+          {label}
+        </Typography>
+      )}
       <Box
-        {...getRootProps()}
         sx={{
-          border: `2px dashed ${theme.palette.border.main}`,
+          border: '2px dashed',
+          borderColor: 'grey.400',
           borderRadius: '8px',
           p: 2,
-          textAlign: 'center',
-          cursor: 'pointer',
-          bgcolor: isDragActive ? theme.palette.action.hover : 'transparent',
-          transition: 'background-color 0.2s',
-          '&:hover': { bgcolor: theme.palette.action.hover },
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          bgcolor: 'grey.100',
+          minHeight: '200px',
           position: 'relative',
+          overflow: 'hidden',
         }}
-        aria-describedby="image-uploader-desc"
       >
-        <input id="image-uploader-input" {...getInputProps()} />
-        {previewUrl ? (
-          <Box sx={{ position: 'relative', display: 'inline-block' }}>
+        {loading ? (
+          <CircularProgress />
+        ) : previewUrl ? (
+          <Box sx={{ position: 'relative', width: '100%', height: '100%' }}>
             <Box
               component="img"
               src={previewUrl}
-              alt="Uploaded image preview"
+              alt="Preview"
+              onError={handleImageError}
               sx={{
-                maxWidth: '100%',
-                maxHeight: { xs: '150px', sm: '200px' },
-                borderRadius: '4px',
+                width: '100%',
+                height: '200px',
                 objectFit: 'cover',
-              }}
-              onError={(e) => {
-                console.error('[ImageUploader] Image load failed:', previewUrl);
-                if (typeof image === 'string' && !failedUrls.current.has(image)) {
-                  failedUrls.current.add(image); // Cache failed URL
-                  e.target.src = '/images/default-hero.jpg';
-                  setError('Failed to load image preview.');
-                }
+                borderRadius: '4px',
               }}
             />
             <IconButton
-              onClick={handleClear}
-              aria-label="Clear uploaded image"
+              onClick={handleRemoveImage}
               sx={{
                 position: 'absolute',
-                top: -12,
-                right: -12,
-                bgcolor: theme.palette.error.main,
-                color: '#fff',
-                '&:hover': { bgcolor: theme.palette.error.dark },
+                top: 8,
+                right: 8,
+                bgcolor: 'rgba(0, 0, 0, 0.5)',
+                color: 'white',
+                '&:hover': { bgcolor: 'rgba(0, 0, 0, 0.7)' },
               }}
-              size="small"
+              aria-label="Remove image"
             >
-              <ClearIcon fontSize="small" />
+              <DeleteIcon />
             </IconButton>
           </Box>
         ) : (
-          <Typography
-            color="text.secondary"
-            sx={{ fontSize: { xs: '0.9rem', sm: '1rem' } }}
-            id="image-uploader-desc"
-          >
-            {isDragActive
-              ? 'Drop the image here'
-              : 'Drag & drop an image or click to select (JPG, PNG, max 5MB)'}
-          </Typography>
+          <Box sx={{ textAlign: 'center' }}>
+            <PhotoCameraIcon sx={{ fontSize: 40, color: 'grey.600', mb: 1 }} />
+            <Typography variant="body2" color="text.secondary">
+              Drag and drop or click to upload
+            </Typography>
+          </Box>
         )}
+        <input
+          type="file"
+          accept="image/jpeg,image/png"
+          onChange={handleFileChange}
+          ref={fileInputRef}
+          style={{
+            opacity: 0,
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            width: '100%',
+            height: '100%',
+            cursor: 'pointer',
+          }}
+        />
       </Box>
       {error && (
-        <Typography color="error" sx={{ mt: 1, fontSize: '0.9rem' }}>
+        <Typography color="error" variant="body2" sx={{ mt: 1 }}>
           {error}
         </Typography>
       )}
     </Box>
   );
+};
+
+ImageUploader.propTypes = {
+  label: PropTypes.string,
+  image: PropTypes.oneOfType([PropTypes.string, PropTypes.instanceOf(File)]),
+  onImageChange: PropTypes.func.isRequired,
+  sx: PropTypes.object,
 };
 
 export default ImageUploader;
