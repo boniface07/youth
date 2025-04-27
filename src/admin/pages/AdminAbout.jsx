@@ -6,26 +6,65 @@ import {
   Grid,
   Paper,
   Box,
-  
   CircularProgress,
   Dialog,
   DialogTitle,
   DialogContent,
   DialogActions,
+  Alert,
+  Snackbar,
+  Tabs,
+  Tab,
 } from '@mui/material';
-import { Save } from '@mui/icons-material';
+import { Save, Refresh } from '@mui/icons-material';
 import { Formik, Form } from 'formik';
 import * as Yup from 'yup';
 import axios from 'axios';
+import DOMPurify from 'dompurify';
 import TextEditor from '../component/TextEditor';
 import ListEditor from '../component/ListEditor';
+import { theme } from '../../theme';
+
+// Ensure no trailing slash in API_BASE_URL
+const API_BASE_URL = (import.meta.env.VITE_API_URL || 'https://youth-spark-backend-production.up.railway.app')
+  .replace(/\/+$/, '')
+  .trim();
 
 const validationSchema = Yup.object({
-  vision: Yup.string().required('Vision is required').max(5000, 'Vision must be 5000 characters or less'),
-  mission: Yup.string().required('Mission is required').max(5000, 'Mission must be 5000 characters or less'),
-  missionPoints: Yup.array().of(Yup.string().max(500, 'Each point must be 500 characters or less')),
-  historyPoints: Yup.array().of(Yup.string().max(500, 'Each point must be 500 characters or less')),
+  vision: Yup.string()
+    .required('Vision is required')
+    .max(5000, 'Vision must be 5000 characters or less')
+    .trim(),
+  mission: Yup.string()
+    .required('Mission is required')
+    .max(5000, 'Mission must be 5000 characters or less')
+    .trim(),
+  missionPoints: Yup.array().of(
+    Yup.string()
+      .required('Mission point cannot be empty')
+      .max(500, 'Each point must be 500 characters or less')
+      .trim()
+  ),
+  historyPoints: Yup.array().of(
+    Yup.string()
+      .required('History point cannot be empty')
+      .max(500, 'Each point must be 500 characters or less')
+      .trim()
+  ),
 });
+
+// Reusable Tab Panel Component
+const TabPanel = ({ children, value, index, ...other }) => (
+  <Box
+    role="tabpanel"
+    hidden={value !== index}
+    id={`about-tabpanel-${index}`}
+    aria-labelledby={`about-tab-${index}`}
+    {...other}
+  >
+    {value === index && <Box sx={{ p: 3 }}>{children}</Box>}
+  </Box>
+);
 
 const AdminAbout = () => {
   const [initialValues, setInitialValues] = useState({
@@ -36,12 +75,19 @@ const AdminAbout = () => {
   });
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [success, setSuccess] = useState(null);
   const [openDialog, setOpenDialog] = useState(false);
+  const [resetDialogOpen, setResetDialogOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState(0);
 
   const fetchData = async () => {
+    setIsLoading(true);
+    setError(null);
     try {
-      setIsLoading(true);
-      const response = await axios.get('/api/about', { timeout: 5000 });
+      const response = await axios.get(`${API_BASE_URL}/api/about`, { timeout: 10000 });
+      if (!response.data) {
+        throw new Error('Empty response from server');
+      }
       setInitialValues({
         vision: response.data.vision || '',
         mission: response.data.mission || '',
@@ -61,25 +107,75 @@ const AdminAbout = () => {
   }, []);
 
   const handleSubmit = async (values, { setSubmitting }) => {
+    const token = localStorage.getItem('token');
+    if (!token) {
+      setError('Please log in to save changes.');
+      setSubmitting(false);
+      return;
+    }
     setOpenDialog(true);
     setSubmitting(false);
   };
 
   const confirmSubmit = async (values) => {
+    setIsLoading(true);
+    setError(null);
+    setSuccess(null);
     try {
-      await axios.put('/api/about', values, {
-        timeout: 5000,
+      await axios.put(`${API_BASE_URL}/api/about`, values, {
+        timeout: 10000,
         headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
       });
+      setInitialValues(values);
+      setSuccess('Content updated successfully!');
       setOpenDialog(false);
-      alert('Content updated successfully!');
     } catch (err) {
       console.error('Error saving data:', err);
-      setError(err.response?.data?.error || 'Failed to save changes. Please try again.');
+      const errorMessage = err.response?.data?.error || 'Failed to save changes. Please try again.';
+      setError(errorMessage);
+      if (err.response?.status === 401 || err.response?.status === 403) {
+        setError('Session expired. Please log in again.');
+        // Optionally redirect to login page
+        // window.location.href = '/login';
+      }
+      setOpenDialog(false);
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  if (isLoading) {
+  const handleReset = async (setValues) => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const response = await axios.get(`${API_BASE_URL}/api/about`, { timeout: 10000 });
+      if (!response.data) {
+        throw new Error('Empty response from server');
+      }
+      const values = {
+        vision: response.data.vision || '',
+        mission: response.data.mission || '',
+        missionPoints: Array.isArray(response.data.missionPoints) ? response.data.missionPoints : [],
+        historyPoints: Array.isArray(response.data.historyPoints) ? response.data.historyPoints : [],
+      };
+      setValues(values);
+      setInitialValues(values);
+    } catch (err) {
+      console.error('Error resetting data:', err);
+      setError('Failed to reset content. Please try again.');
+    } finally {
+      setIsLoading(false);
+      setResetDialogOpen(false);
+    }
+  };
+
+  const handleTabChange = (event, newValue) => {
+    setActiveTab(newValue);
+  };
+
+  const gradient = `linear-gradient(90deg, ${theme.palette.primary.main}, ${theme.palette.secondary.main})`;
+
+  if (isLoading && !initialValues.vision) {
     return (
       <Container maxWidth="xl" sx={{ py: 4, textAlign: 'center' }}>
         <CircularProgress aria-label="Loading editor" />
@@ -93,14 +189,32 @@ const AdminAbout = () => {
         variant="h1"
         component="h1"
         gutterBottom
-        sx={{ mb: 4, fontSize: { xs: '2rem', md: '3rem' } }}
+        sx={{
+          mb: 4,
+          fontSize: { xs: '2rem', md: '3rem' },
+          background: gradient,
+          WebkitBackgroundClip: 'text',
+          WebkitTextFillColor: 'transparent',
+        }}
       >
         About Page Editor
       </Typography>
       {error && (
-        <Typography color="error" sx={{ mb: 2 }}>
+        <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
           {error}
-        </Typography>
+        </Alert>
+      )}
+      {success && (
+        <Snackbar
+          open={!!success}
+          autoHideDuration={6000}
+          onClose={() => setSuccess(null)}
+          anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+        >
+          <Alert severity="success" onClose={() => setSuccess(null)}>
+            {success}
+          </Alert>
+        </Snackbar>
       )}
       <Paper sx={{ p: 4, borderRadius: 2, boxShadow: 2 }}>
         <Formik
@@ -109,7 +223,7 @@ const AdminAbout = () => {
           onSubmit={handleSubmit}
           enableReinitialize
         >
-          {({ values, setFieldValue, errors, touched, isSubmitting }) => (
+          {({ values, setFieldValue, setValues, errors, touched, isSubmitting }) => (
             <Form aria-label="About page editor form">
               <Grid container spacing={4}>
                 {/* Form Section */}
@@ -121,7 +235,7 @@ const AdminAbout = () => {
                     sx={{ mb: 3 }}
                   />
                   {touched.vision && errors.vision && (
-                    <Typography color="error" sx={{ mb: 2 }}>
+                    <Typography color="error" sx={{ mb: 2, fontSize: '0.9rem' }}>
                       {errors.vision}
                     </Typography>
                   )}
@@ -132,7 +246,7 @@ const AdminAbout = () => {
                     sx={{ mb: 3 }}
                   />
                   {touched.mission && errors.mission && (
-                    <Typography color="error" sx={{ mb: 2 }}>
+                    <Typography color="error" sx={{ mb: 2, fontSize: '0.9rem' }}>
                       {errors.mission}
                     </Typography>
                   )}
@@ -141,24 +255,58 @@ const AdminAbout = () => {
                     items={values.missionPoints}
                     onChange={(items) => setFieldValue('missionPoints', items)}
                     placeholder="Add new mission point"
+                    sx={{ mb: 3 }}
                   />
+                  {touched.missionPoints &&
+                    errors.missionPoints &&
+                    errors.missionPoints.map((error, index) => (
+                      <Typography key={index} color="error" sx={{ mb: 2, fontSize: '0.9rem' }}>
+                        Mission Point {index + 1}: {error}
+                      </Typography>
+                    ))}
                   <ListEditor
                     label="History Points"
                     items={values.historyPoints}
                     onChange={(items) => setFieldValue('historyPoints', items)}
                     placeholder="Add new history point"
+                    sx={{ mb: 3 }}
                   />
-                  <Button
-                    type="submit"
-                    variant="contained"
-                    color="primary"
-                    startIcon={<Save />}
-                    disabled={isSubmitting}
-                    sx={{ mt: 2 }}
-                    aria-label="Save changes"
-                  >
-                    Save Changes
-                  </Button>
+                  {touched.historyPoints &&
+                    errors.historyPoints &&
+                    errors.historyPoints.map((error, index) => (
+                      <Typography key={index} color="error" sx={{ mb: 2, fontSize: '0.9rem' }}>
+                        History Point {index + 1}: {error}
+                      </Typography>
+                    ))}
+                  <Box sx={{ display: 'flex', gap: 2, mt: 2 }}>
+                    <Button
+                      type="submit"
+                      variant="contained"
+                      color="primary"
+                      startIcon={<Save />}
+                      disabled={isSubmitting || isLoading}
+                      sx={{
+                        background: gradient,
+                        '&:hover': { transform: 'scale(1.05)' },
+                      }}
+                      aria-label="Save changes"
+                    >
+                      Save Changes
+                    </Button>
+                    <Button
+                      variant="outlined"
+                      startIcon={<Refresh />}
+                      onClick={() => setResetDialogOpen(true)}
+                      disabled={isSubmitting || isLoading}
+                      sx={{
+                        borderColor: theme.palette.border.main,
+                        color: theme.palette.text.primary,
+                      }}
+                      aria-label="Reset form"
+                    >
+                      Reset
+                    </Button>
+                  </Box>
                 </Grid>
 
                 {/* Preview Section */}
@@ -167,70 +315,149 @@ const AdminAbout = () => {
                     <Typography variant="h6" gutterBottom>
                       Preview
                     </Typography>
-                    <Box sx={{ p: 2, bgcolor: 'background.default', borderRadius: 2 }}>
-                      <Typography variant="h3" gutterBottom>
-                        Vision
+                    <Tabs
+                      value={activeTab}
+                      onChange={handleTabChange}
+                      variant="fullWidth"
+                      aria-label="About preview tabs"
+                      sx={{
+                        mb: 3,
+                        '& .MuiTabs-indicator': {
+                          height: 3,
+                          borderRadius: '3px 3px 0 0',
+                          background: gradient,
+                        },
+                        '& .MuiTab-root': {
+                          textTransform: 'none',
+                          py: 1.5,
+                          color: 'text.secondary',
+                          '&.Mui-selected': { color: 'primary.main' },
+                          '&:hover': { color: 'primary.dark', bgcolor: 'action.hover' },
+                        },
+                      }}
+                    >
+                      <Tab label="Vision & Mission" id="preview-tab-0" aria-controls="preview-tabpanel-0" />
+                      <Tab label="Our History" id="preview-tab-1" aria-controls="preview-tabpanel-1" />
+                    </Tabs>
+                    <TabPanel value={activeTab} index={0}>
+                      <Typography variant="h4" sx={{ mb: 2 }}>
+                        Our Vision
                       </Typography>
                       <Typography
-                        sx={{ mb: 4 }}
-                        dangerouslySetInnerHTML={{ __html: values.vision || 'No vision provided.' }}
+                        sx={{ lineHeight: 1.8, color: 'text.secondary', mb: 4 }}
+                        dangerouslySetInnerHTML={{
+                          __html: DOMPurify.sanitize(values.vision || 'No vision provided.'),
+                        }}
                       />
-                      <Typography variant="h3" gutterBottom>
-                        Mission
+                      <Typography variant="h4" sx={{ mb: 2 }}>
+                        Our Mission
                       </Typography>
                       <Typography
-                        sx={{ mb: 4 }}
-                        dangerouslySetInnerHTML={{ __html: values.mission || 'No mission provided.' }}
+                        sx={{ lineHeight: 1.8, color: 'text.secondary', mb: 4 }}
+                        dangerouslySetInnerHTML={{
+                          __html: DOMPurify.sanitize(values.mission || 'No mission provided.'),
+                        }}
                       />
-                      <Typography variant="h5" gutterBottom>
-                        Mission Points
+                      <Typography variant="h5" sx={{ mb: 2, textAlign: 'center' }}>
+                        Key Focus Areas
                       </Typography>
-                      <Box component="ul" sx={{ pl: 4, mb: 4 }}>
-                        {values.missionPoints.length === 0 ? (
-                          <Typography sx={{ color: 'text.secondary' }}>
-                            No mission points added.
-                          </Typography>
-                        ) : (
-                          values.missionPoints.map((point, index) => (
-                            <Typography component="li" key={index} sx={{ mb: 1 }}>
-                              {point}
-                            </Typography>
-                          ))
-                        )}
-                      </Box>
-                      <Typography variant="h5" gutterBottom>
-                        History Points
+                      {values.missionPoints.length === 0 ? (
+                        <Typography sx={{ textAlign: 'center', color: 'text.secondary' }}>
+                          No mission points added.
+                        </Typography>
+                      ) : (
+                        <Box
+                          sx={{
+                            display: 'grid',
+                            gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' },
+                            gap: 2,
+                          }}
+                        >
+                          {values.missionPoints.map((point, index) => (
+                            <Box
+                              key={index}
+                              sx={{
+                                p: 2,
+                                bgcolor: 'background.default',
+                                borderRadius: 2,
+                                borderLeft: `4px solid ${theme.palette.primary.main}`,
+                              }}
+                            >
+                              <Typography sx={{ color: 'text.primary' }}>
+                                {DOMPurify.sanitize(point)}
+                              </Typography>
+                            </Box>
+                          ))}
+                        </Box>
+                      )}
+                    </TabPanel>
+                    <TabPanel value={activeTab} index={1}>
+                      <Typography variant="h4" sx={{ mb: 3, textAlign: 'center' }}>
+                        Our Journey
                       </Typography>
-                      <Box component="ul" sx={{ pl: 4 }}>
-                        {values.historyPoints.length === 0 ? (
-                          <Typography sx={{ color: 'text.secondary' }}>
-                            No history points added.
-                          </Typography>
-                        ) : (
-                          values.historyPoints.map((point, index) => (
-                            <Typography component="li" key={index} sx={{ mb: 1 }}>
-                              {point}
-                            </Typography>
-                          ))
-                        )}
-                      </Box>
-                    </Box>
+                      {values.historyPoints.length === 0 ? (
+                        <Typography sx={{ textAlign: 'center', color: 'text.secondary' }}>
+                          No history points added.
+                        </Typography>
+                      ) : (
+                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                          {values.historyPoints.map((point, index) => (
+                            <Box
+                              key={index}
+                              sx={{
+                                p: 2,
+                                bgcolor: 'background.default',
+                                borderRadius: 2,
+                              }}
+                            >
+                              <Typography sx={{ color: 'text.secondary', lineHeight: 1.8 }}>
+                                {DOMPurify.sanitize(point)}
+                              </Typography>
+                            </Box>
+                          ))}
+                        </Box>
+                      )}
+                    </TabPanel>
                   </Paper>
                 </Grid>
               </Grid>
               <Dialog open={openDialog} onClose={() => setOpenDialog(false)}>
                 <DialogTitle>Confirm Changes</DialogTitle>
-                <DialogContent>Are you sure you want to save these changes?</DialogContent>
+                <DialogContent>
+                  <Typography>Are you sure you want to save these changes?</Typography>
+                </DialogContent>
                 <DialogActions>
-                  <Button onClick={() => setOpenDialog(false)} disabled={isSubmitting}>
+                  <Button onClick={() => setOpenDialog(false)} disabled={isLoading}>
                     Cancel
                   </Button>
                   <Button
                     onClick={() => confirmSubmit(values)}
                     color="primary"
-                    disabled={isSubmitting}
+                    disabled={isLoading}
+                    autoFocus
                   >
-                    Save
+                    {isLoading ? <CircularProgress size={24} /> : 'Save'}
+                  </Button>
+                </DialogActions>
+              </Dialog>
+              <Dialog open={resetDialogOpen} onClose={() => setResetDialogOpen(false)}>
+                <DialogTitle>Confirm Reset</DialogTitle>
+                <DialogContent>
+                  <Typography>
+                    Are you sure you want to reset the form? This will discard unsaved changes and reload the saved content.
+                  </Typography>
+                </DialogContent>
+                <DialogActions>
+                  <Button onClick={() => setResetDialogOpen(false)} disabled={isLoading}>
+                    Cancel
+                  </Button>
+                  <Button
+                    onClick={() => handleReset(setValues)}
+                    color="primary"
+                    disabled={isLoading}
+                    autoFocus
+                  >
+                    {isLoading ? <CircularProgress size={24} /> : 'Reset'}
                   </Button>
                 </DialogActions>
               </Dialog>
