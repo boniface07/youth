@@ -334,14 +334,20 @@ const AdminPrograms = () => {
     setIsLoading(true);
     setError(null);
     try {
+      console.log('Fetching programs from:', `${API_BASE_URL}/api/programs`);
       const response = await axios.get(`${API_BASE_URL}/api/programs`, { timeout: 10000 });
-      if (!response.data || !Array.isArray(response.data)) {
-        throw new Error('Invalid response from server');
+      console.log('Raw response.data:', response.data); // Debug log
+      if (!Array.isArray(response.data)) {
+        console.error('Expected an array, received:', typeof response.data, response.data);
+        throw new Error('Invalid response format: Expected an array of programs');
       }
       setInitialValues({ programs: response.data });
     } catch (err) {
-      console.error('Error fetching programs:', err);
-      setError('Failed to load programs. Please try again.');
+      console.error('Error fetching programs:', err.message, err.response?.data);
+      setError(
+        err.response?.data?.error ||
+        'Failed to load programs. Please check the API endpoint and try again.'
+      );
     } finally {
       setIsLoading(false);
     }
@@ -367,6 +373,7 @@ const AdminPrograms = () => {
     setError(null);
     setSuccess(null);
     try {
+      console.log('Saving programs:', values.programs);
       await axios.put(`${API_BASE_URL}/api/programs`, values.programs, {
         timeout: 10000,
         headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
@@ -375,7 +382,7 @@ const AdminPrograms = () => {
       setSuccess('Programs updated successfully!');
       setOpenDialog(false);
     } catch (err) {
-      console.error('Error saving programs:', err);
+      console.error('Error saving programs:', err.message, err.response?.data);
       const errorMessage = err.response?.data?.error || 'Failed to save changes. Please try again.';
       setError(errorMessage);
       if (err.response?.status === 401 || err.response?.status === 403) {
@@ -393,15 +400,18 @@ const AdminPrograms = () => {
     setIsLoading(true);
     setError(null);
     try {
+      console.log('Resetting programs from:', `${API_BASE_URL}/api/programs`);
       const response = await axios.get(`${API_BASE_URL}/api/programs`, { timeout: 10000 });
-      if (!response.data || !Array.isArray(response.data)) {
-        throw new Error('Invalid response from server');
+      console.log('Reset response.data:', response.data); // Debug log
+      if (!Array.isArray(response.data)) {
+        console.error('Expected an array, received:', typeof response.data, response.data);
+        throw new Error('Invalid response format: Expected an array of programs');
       }
       const values = { programs: response.data };
       setValues(values);
       setInitialValues(values);
     } catch (err) {
-      console.error('Error resetting programs:', err);
+      console.error('Error resetting programs:', err.message, err.response?.data);
       setError('Failed to reset programs. Please try again.');
     } finally {
       setIsLoading(false);
