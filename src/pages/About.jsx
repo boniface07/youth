@@ -160,7 +160,7 @@ const About = () => {
               component="h1"
               sx={{
                 mb: 2,
-                background: gradient,
+                color:`${theme.palette.primary.main}`,
                 WebkitBackgroundClip: 'text',
                 WebkitTextFillColor: 'transparent',
                 fontSize: { xs: '2rem', md: '3rem' },
