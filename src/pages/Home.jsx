@@ -192,7 +192,7 @@ const Home = () => {
           flexDirection: { xs: 'column', md: 'row' },
           alignItems: 'center',
           justifyContent: 'center',
-          background: `linear-gradient(135deg, ${theme.palette.primary.main}, ${theme.palette.secondary.main})`,
+          backgroundColor: `${theme.palette.primary.main}`,
           color: '#ffffff',
           borderRadius: { xs: '8px', md: '12px' },
           position: 'relative',
