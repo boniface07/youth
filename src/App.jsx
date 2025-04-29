@@ -247,7 +247,7 @@ function MainApp() {
               style={{ display: 'flex', alignItems: 'center', textDecoration: 'none' }}
             >
               <img
-                src="/logo.png"
+                src="../assets/logo.png"
                 alt="Youth Spark Foundation Logo"
                 style={{
                   width: 48,
@@ -257,39 +257,6 @@ function MainApp() {
                   animation: logoClicked ? 'pulse 0.5s ease-out' : 'none',
                 }}
               />
-              <Box sx={{ display: 'flex', flexDirection: 'column' }}>
-                <Typography
-                  variant="h6"
-                  sx={{
-                    fontWeight: 700,
-                    fontSize: { xs: '1.2rem', md: '1.3rem' },
-                    lineHeight: 1.2,
-                    textDecoration: 'none',
-                    background: 'linear-gradient(to right, #1e40ae, #c23120)',
-                    WebkitBackgroundClip: 'text',
-                    backgroundClip: 'text',
-                    color: 'transparent',
-                    '&:hover': { textDecoration: 'none' },
-                    '&:active': { textDecoration: 'none' },
-                  }}
-                >
-                  Youth Spark
-                </Typography>
-                <Typography
-                  variant="caption"
-                  sx={{
-                    fontSize: { xs: '0.75rem', md: '0.85rem' },
-                    color: theme.palette.text.secondary,
-                    fontWeight: 400,
-                    letterSpacing: '0.1em',
-                    textDecoration: 'none',
-                    '&:hover': { textDecoration: 'none' },
-                    '&:active': { textDecoration: 'none' },
-                  }}
-                >
-                  FOUNDATION
-                </Typography>
-              </Box>
             </NavLink>
           </Box>
 
