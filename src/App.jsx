@@ -250,8 +250,8 @@ function MainApp() {
                 src="https://res.cloudinary.com/drptenuvr/image/upload/v1745919545/logo_ix1rdl.png"
                 alt="Youth Spark Foundation Logo"
                 style={{
-                  width: 200,
-                  height: 200,
+                  width: "auto",
+                  height: "50px",
                   transition: 'all 0.3s ease',
                   transform: logoClicked ? 'scale(1.1) rotate(5deg)' : 'scale(1) rotate(0deg)',
                   animation: logoClicked ? 'pulse 0.5s ease-out' : 'none',
