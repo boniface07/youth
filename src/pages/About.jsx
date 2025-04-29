@@ -172,7 +172,7 @@ const About = () => {
               variant="subtitle1"
               sx={{ color: 'text.secondary', maxWidth: 700, mx: 'auto' }}
             >
-              Discover our mission, vision, and the inspiring journey of Youth Spark Foundation
+              Discover our mission, vision, and the inspiring journey of Youth Spark Foundation44444444
             </Typography>
           </Box>
 
