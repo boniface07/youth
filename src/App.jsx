@@ -247,7 +247,7 @@ function MainApp() {
               style={{ display: 'flex', alignItems: 'center', textDecoration: 'none' }}
             >
               <img
-                src="https://res.cloudinary.com/drptenuvr/image/upload/v1745748899/youth_spark/images/logo_ix1rdl.png"
+                src="https://res.cloudinary.com/drptenuvr/image/upload/v1745919545/logo_ix1rdl.png"
                 alt="Youth Spark Foundation Logo"
                 style={{
                   width: 48,
