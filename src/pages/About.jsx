@@ -161,8 +161,6 @@ const About = () => {
               sx={{
                 mb: 2,
                 color:`${theme.palette.primary.main}`,
-                WebkitBackgroundClip: 'text',
-                WebkitTextFillColor: 'transparent',
                 fontSize: { xs: '2rem', md: '3rem' },
               }}
             >
@@ -172,7 +170,7 @@ const About = () => {
               variant="subtitle1"
               sx={{ color: 'text.secondary', maxWidth: 700, mx: 'auto' }}
             >
-              Discover our mission, vision, and the inspiring journey of Youth Spark Foundation44444444
+              Discover our mission, vision, and the inspiring journey of Youth Spark Foundation
             </Typography>
           </Box>
 
