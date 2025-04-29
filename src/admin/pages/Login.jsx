@@ -85,7 +85,7 @@ const Login = () => {
             sx={{
               mb: 4,
               fontWeight: 700,
-              background: `linear-gradient(135deg, ${theme.palette.primary.main}, ${theme.palette.secondary.main})`,
+              backgroundColor: ` ${theme.palette.primary.main}`,
               WebkitBackgroundClip: 'text',
               WebkitTextFillColor: 'transparent',
             }}
@@ -122,7 +122,7 @@ const Login = () => {
               fullWidth
               disabled={isLoading}
               sx={{
-                background: `linear-gradient(135deg, ${theme.palette.primary.main}, ${theme.palette.secondary.main})`,
+                backgroundColor: ` ${theme.palette.primary.main}`,
                 '&:hover': { transform: 'scale(1.05)' },
               }}
             >
